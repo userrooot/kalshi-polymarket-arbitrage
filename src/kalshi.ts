@@ -2,7 +2,6 @@ import { config } from "./config.ts";
 import { getJson, realAsk } from "./http.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
 
-const cents = (d: unknown) => (d === undefined || d === null || d === "" ? null : Number(d) * 100);
 const bid = (c: number | null) => (c !== null && Number.isFinite(c) && c > 0 ? c : null);
 
 let cached: any = null; // current-window market (static fields)
@@ -18,11 +17,17 @@ async function findCurrent(now: number) {
 export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | null> {
   const base = await findCurrent(now);
   if (!base) return null;
-  const j = await getJson(`${config.kalshiBase}/markets/${base.ticker}`); // fresh prices each tick
-  const fresh = j?.market ?? null;
-  // Never fall back to the cached listing's quotes: they can be minutes old and would create phantom trades.
-  const m = fresh ?? base;
-  const q = (v: unknown) => (fresh ? v : null);
+  // Live quotes from the orderbook: GET /markets/{ticker} lags the book by several seconds, which pairs a stale
+  // Kalshi price with a fresh Polymarket book and fakes arbs. Kalshi books hold BIDS only:
+  // YES ask = 100 - best NO bid, NO ask = 100 - best YES bid. Never fall back to stale listing quotes.
+  const j = await getJson(`${config.kalshiBase}/markets/${base.ticker}/orderbook`);
+  const ob = j?.orderbook_fp ?? j?.orderbook ?? null;
+  const best = (lv: unknown) => {
+    const px = (Array.isArray(lv) ? lv : []).filter((l: any) => Number(l?.[1]) > 0).map((l: any) => Number(l[0]) * 100).filter(Number.isFinite);
+    return px.length ? Math.round(Math.max(...px) * 100) / 100 : null;
+  };
+  const yesBid = ob ? bid(best(ob.yes_dollars)) : null, noBid = ob ? bid(best(ob.no_dollars)) : null;
+  const m = base;
   return {
     venue: "kalshi",
     marketId: m.ticker,
@@ -30,10 +35,10 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
     strike: typeof m.floor_strike === "number" ? m.floor_strike : Number(m.floor_strike) || null,
     openTime: m.open_time,
     closeTime: m.close_time,
-    upAsk: realAsk(cents(q(m.yes_ask_dollars))),
-    downAsk: realAsk(cents(q(m.no_ask_dollars))),
-    upBid: bid(cents(q(m.yes_bid_dollars))),
-    downBid: bid(cents(q(m.no_bid_dollars))),
+    upAsk: noBid === null ? null : realAsk(100 - noBid),
+    downAsk: yesBid === null ? null : realAsk(100 - yesBid),
+    upBid: yesBid,
+    downBid: noBid,
     ts: Date.now(),
   };
 }
