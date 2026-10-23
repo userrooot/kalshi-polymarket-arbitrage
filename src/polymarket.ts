@@ -1,5 +1,7 @@
 import { config } from "./config.ts";
-import { btcAtWindowStart } from "./btc.ts";
+import { btcAtWindowStart, btcPrice, btcRestTs } from "./btc.ts";
+import { chainlinkAvg60, chainlinkSpot } from "./feeds/chainlink.ts";
+import { polyTop, setPolyTop, watchTokens } from "./feeds/polyBook.ts";
 import { getJson, jsonArr, realAsk } from "./http.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
 
@@ -36,23 +38,39 @@ async function lookup(now: number): Promise<Lookup | null> {
   return l;
 }
 
-/** Orderbook sides are not guaranteed sorted: best ask = MIN, best bid = MAX. */
-async function book(token: string) {
+/** REST orderbook (fallback only). Sides are not guaranteed sorted: best ask = MIN, best bid = MAX. */
+async function restBook(token: string) {
   const b = await getJson(`${config.clobUrl}/book?token_id=${token}`);
-  if (!b) return { ask: null, bid: null };
+  if (!b) return null;
   const px = (a: any) => (Array.isArray(a) ? a.filter((x) => Number(x.size) > 0).map((x) => Number(x.price) * 100).filter(Number.isFinite) : []);
   const asks = px(b.asks), bids = px(b.bids);
   return { ask: asks.length ? realAsk(Math.min(...asks)) : null, bid: bids.length ? Math.max(...bids) : null };
 }
 
+let lastRest = 0;
 export async function fetchPolymarket(now = Date.now()): Promise<VenueSnapshot | null> {
   const l = await lookup(now);
   if (!l) return null;
-  const [up, down] = await Promise.all([book(l.upToken), book(l.downToken)]);
+  watchTokens(l.upToken, l.downToken);
+  let u = polyTop(l.upToken), d = polyTop(l.downToken);
+  const stale = (t: typeof u) => !t || Date.now() - t.ts > config.maxQuoteAgeMs;
+  if ((stale(u) || stale(d)) && Date.now() - lastRest >= 2000) { // quiet or disconnected WS book: confirm via REST (throttled)
+    lastRest = Date.now();
+    const [ru, rd] = await Promise.all([restBook(l.upToken), restBook(l.downToken)]);
+    if (ru) setPolyTop(l.upToken, ru.ask, ru.bid);
+    if (rd) setPolyTop(l.downToken, rd.ask, rd.bid);
+    u = polyTop(l.upToken); d = polyTop(l.downToken);
+  }
+  const t = Date.now();
+  const cl = chainlinkSpot(), fb = btcPrice();
   return {
     venue: "polymarket", marketId: l.slug, title: l.title, strike: l.strike,
     openTime: l.openTime, closeTime: l.closeTime,
-    upAsk: up.ask, downAsk: down.ask, upBid: up.bid, downBid: down.bid, ts: Date.now(),
+    upAsk: realAsk(u?.ask ?? null), downAsk: realAsk(d?.ask ?? null), upBid: u?.bid ?? null, downBid: d?.bid ?? null, ts: t,
+    spot: cl?.price ?? fb, spotSource: cl ? "chainlink" : fb !== null ? "coinbase-rest" : null,
+    spotTs: cl ? cl.ts : fb !== null ? btcRestTs() : null, spotAvg60: chainlinkAvg60(),
+    quoteSource: u?.rest || d?.rest ? "rest" : "ws",
+    quoteAgeMs: u && d ? t - Math.min(u.ts, d.ts) : null,
   };
 }
 

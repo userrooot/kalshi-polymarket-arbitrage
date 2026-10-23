@@ -134,11 +134,11 @@ export function pnlHistory(): PnlPoint[] {
     .map((t) => ({ ts: t.settledAt!, cumPnlUsd: Math.round((cum += t.pnlUsd!) * 100) / 100, tradeId: t.id }));
 }
 
-export function buildState(now: number, btc: number | null, k: VenueSnapshot | null, p: VenueSnapshot | null, combos: Combo[]): DashboardState {
+export function buildState(now: number, btc: number | null, k: VenueSnapshot | null, p: VenueSnapshot | null, combos: Combo[], extra: Pick<DashboardState, "feeds" | "tickRate">): DashboardState {
   const eventKey = k?.closeTime ?? null;
   return {
     now, maxTotalCost: config.maxTotalCost, maxTradesPerEvent: config.maxTradesPerEvent, contractsPerTrade: config.contractsPerTrade,
-    btcPrice: btc, kalshi: k, polymarket: p, combos, eventKey,
+    btcPrice: btc, ...extra, kalshi: k, polymarket: p, combos, eventKey,
     tradesThisEvent: eventKey ? eventTrades(eventKey).length : 0,
     stats: stats(), costHistory, pnlHistory: pnlHistory(), recentTrades: recentTrades(100),
   };
