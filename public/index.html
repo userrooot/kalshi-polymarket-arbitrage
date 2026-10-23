@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>BTC 15m Arbitrage Simulator</title>
+<link rel="icon" href="data:,">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root {
@@ -139,11 +140,13 @@ main { padding: 16px; display: grid; gap: 16px; max-width: 1400px; margin: 0 aut
   font-size: 12px;
 }
 .feed-list { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
-.feed { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.feed { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; max-width: 100%; }
 .feed .dot { width: 8px; height: 8px; }
 .feed b { font-weight: 600; }
-.feeds .rates { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); color: var(--muted); }
+.feeds .rates { order: 1; margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); color: var(--muted); }
 .feeds .rates b { color: var(--text); font-weight: 600; }
+.feed-sum { order: 2; flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 4px 18px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.feed-sum b { color: var(--text); font-weight: 600; }
 
 /* ---------- arbitrage ---------- */
 .combos { display: grid; gap: 12px; grid-template-columns: 1fr; }
@@ -248,6 +251,10 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
       <span><b id="rate-ticks">—</b> ticks/s</span>
       <span><b id="rate-bcast">—</b> broadcasts/s</span>
     </div>
+    <div class="feed-sum" aria-label="Up/Down update rates">
+      <span>Kalshi Up/Down updates/s: <b id="fs-k">—</b> <span id="fs-k-src"></span></span>
+      <span>Polymarket Up/Down updates/s: <b id="fs-p">—</b></span>
+    </div>
   </section>
 
   <section class="stats" aria-label="Statistics">
@@ -274,12 +281,12 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
           </span>
         </div>
         <div class="spot-price" id="k-spot-price">—</div>
-        <div class="spot-src muted" id="k-spot-src" title="BRTI is licensed, so this is an approximation of the index">≈ BRTI proxy (median of 6 exchanges)</div>
+        <div class="spot-src muted" id="k-spot-src">CF Benchmarks BRTI (live index, 5Hz)</div>
         <div class="spot-sub">
           <div><label>60s avg (settlement estimate)</label><b id="k-spot-avg">—</b></div>
           <div><label>Spot − strike</label><b id="k-spot-diff">—</b></div>
         </div>
-        <p class="spot-note">BRTI itself is licensed and has no free live feed. This is a median of exchange mids, so expect about ±$3 versus the index.</p>
+        <p class="spot-note" id="k-spot-note" hidden>BRTI itself is licensed and has no free live feed. This is a median of exchange mids, so expect about ±$3 versus the index.</p>
         <div class="spot-age muted" id="k-spot-age">—</div>
       </div>
       <div class="kv">
@@ -601,7 +608,9 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
 
   // ---------- live BTC spot, quote freshness, feeds ----------
   const SPOT_SRC = {
-    chainlink: "Chainlink BTC/USD",
+    chainlink: "Chainlink BTC/USD (spot, not TWAP)",
+    "chainlink-twap": "Chainlink 60s TWAP (Polymarket resolution source)",
+    cfbenchmarks: "CF Benchmarks BRTI (live index, 5Hz)",
     "brti-proxy": "≈ BRTI proxy (median of 6 exchanges)",
     "coinbase-rest": "Coinbase REST",
   };
@@ -639,6 +648,12 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     const srcKey = v?.spotSource ?? SPOT_DEFAULT[p];
     setText(`${p}-spot-src`, SPOT_SRC[srcKey] ?? String(srcKey));
     $(`${p}-spot-fb`).hidden = srcKey !== "coinbase-rest";
+    // only the Kalshi panel's BRTI proxy is approximate (about ±$3 versus the index)
+    if (p === "k") {
+      const approx = srcKey === "brti-proxy";
+      $("k-spot-note").hidden = !approx;
+      $("k-spot-src").title = approx ? "BRTI is licensed, so this is an approximation of the index" : "";
+    }
     setText(`${p}-spot-avg`, fmtUsd(v?.spotAvg60));
 
     const strike = isNum(v?.strike) ? v.strike : null;
@@ -673,27 +688,52 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     }
   }
 
+  // Up/Down update rate summed over feeds whose name starts with a prefix (kalshiBook*, polyBook*).
+  // Missing or non-numeric fields are skipped; null when no feed reports a rate.
+  function feedRateSum(feeds, prefix) {
+    if (!feeds) return null;
+    const vals = feeds
+      .filter((f) => typeof f.name === "string" && f.name.startsWith(prefix))
+      .map((f) => f.updatesPerSec)
+      .filter(isNum);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+  }
+
   function renderFeeds() {
     const rate = S?.tickRate;
     setText("rate-ticks", isNum(rate?.ticksPerSec) ? rate.ticksPerSec.toFixed(1) : DASH);
     setText("rate-bcast", isNum(rate?.broadcastsPerSec) ? rate.broadcastsPerSec.toFixed(1) : DASH);
     const box = $("feed-list");
-    if (!Array.isArray(S?.feeds)) {
+    const feeds = Array.isArray(S?.feeds) ? S.feeds.filter((f) => f && typeof f === "object") : null;
+
+    const fk = feedRateSum(feeds, "kalshiBook");
+    const fp = feedRateSum(feeds, "polyBook");
+    setText("fs-k", isNum(fk) ? fk.toFixed(1) : DASH);
+    setText("fs-p", isNum(fp) ? fp.toFixed(1) : DASH);
+    const kq = S?.kalshi?.quoteSource;
+    setText("fs-k-src", kq === "ws" || kq === "rest" ? `(${kq})` : "");
+
+    if (!feeds) {
       box.innerHTML = `<span class="muted">No feed status from this backend version</span>`;
       return;
     }
-    if (!S.feeds.length) {
+    if (!feeds.length) {
       box.innerHTML = `<span class="muted">No feeds reported</span>`;
       return;
     }
-    box.innerHTML = S.feeds.map((f) => {
+    box.innerHTML = feeds.map((f) => {
       const base = isNum(f.lastMsgAgeMs) ? f.lastMsgAgeMs : "";
       const rec = isNum(f.reconnects) && f.reconnects > 0
         ? ` <span class="warn">↻${f.reconnects}</span>` : "";
+      const msgs = isNum(f.msgsPerSec) ? f.msgsPerSec.toFixed(1) : DASH;
+      const upd = isNum(f.updatesPerSec) ? f.updatesPerSec.toFixed(1) : DASH;
+      const lat = isNum(f.latencyMs) ? `${Math.round(f.latencyMs)} ms` : DASH;
       return `<span class="feed" title="${esc(f.connected ? "connected" : "disconnected")}">
         <span class="dot ${f.connected ? "live" : "offline"}"></span>
         <b>${esc(f.name)}</b>
-        <span class="mono muted">${isNum(f.msgsPerSec) ? f.msgsPerSec.toFixed(1) : DASH} msg/s</span>
+        <span class="mono muted" title="messages per second">${msgs} msg/s</span>
+        <span class="mono muted" title="price updates per second">${upd} upd/s</span>
+        <span class="mono muted" title="latency">lat ${lat}</span>
         <span class="muted">last <span class="mono feed-age" data-base="${base}">${base === "" ? DASH : fmtAge(base)}</span></span>${rec}
       </span>`;
     }).join("");
