@@ -219,10 +219,76 @@ button.why {
 button.why:hover { border-color: var(--blue); }
 td.empty { text-align: center; color: var(--muted); padding: 20px; }
 
+/* ---------- execution realism (UK colocation study) ---------- */
+.exec-strip { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 14px; }
+.x-chip { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.x-chip b { display: block; font-family: var(--mono); font-size: 14px; overflow-wrap: anywhere; }
+.x-chip.warn { border-color: var(--amber); background: rgba(245, 158, 11, .10); }
+.x-chip.warn b { color: var(--amber); }
+.x-chip.bad { border-color: var(--red); background: rgba(239, 68, 68, .10); }
+.x-chip.bad b { color: var(--red); }
+.x-note { display: block; font-size: 12px; color: var(--muted); margin-top: 4px; overflow-wrap: anywhere; }
+.x-chip.warn .x-note { color: #fcd34d; }
+.x-chip.bad .x-note { color: #fecaca; }
+.x-chip code { font-family: var(--mono); color: var(--text); font-size: 12px; }
+.x-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+.x-box { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-width: 0; }
+.x-box > h4 { margin-bottom: 10px; }
+.x-stats { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.x-stat { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 4px 10px; font-size: 12px; color: var(--muted); }
+.x-stat b { color: var(--text); font-family: var(--mono); margin-left: 6px; }
+.x-foot { font-size: 12px; margin-top: 8px; }
+.x-box .chart-box { height: 220px; }
+.exec-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
+.exec-table th, .exec-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+.exec-table thead th { background: var(--panel); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; }
+.exec-table td.num, .exec-table th.num { text-align: right; font-family: var(--mono); }
+.exec-table tbody th { font-weight: 600; }
+.exec-table tr.best td, .exec-table tr.best th { background: rgba(34, 197, 94, .09); }
+.trio { font-family: var(--mono); }
+.toolbar select { min-width: 0; }
+.att { border: 1px solid var(--border); border-radius: 8px; background: var(--panel); margin-bottom: 8px; }
+.att.open { border-color: var(--blue); }
+.att-head {
+  display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px 12px;
+  cursor: pointer; font-size: 13px; overflow-wrap: anywhere;
+}
+.att-head:hover, .att-head:focus { background: rgba(56, 189, 248, .06); outline: none; }
+.att-head:focus-visible { box-shadow: inset 0 0 0 2px var(--blue); }
+.att-legs { min-width: 0; }
+.att-body { padding: 4px 12px 14px; border-top: 1px solid var(--border); display: grid; gap: 14px; }
+.badge.one { background: var(--amber); color: #111; }
+.badge.none { background: var(--red); color: #fff; }
+.tl { display: grid; gap: 8px; }
+.tl-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; color: var(--muted); }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.tl-row { display: grid; gap: 4px; }
+.tl-name { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; }
+.tl-track { position: relative; height: 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+.seg { position: absolute; top: 0; bottom: 0; min-width: 2px; }
+.seg.wait, .sw.wait { background: repeating-linear-gradient(45deg, #3a4663 0 4px, #1c2538 4px 8px); }
+.seg.fly, .sw.fly { background: var(--blue); opacity: .8; }
+.seg.ack-FILLED, .sw.ack-FILLED { background: var(--green); }
+.seg.ack-PARTIAL, .sw.ack-PARTIAL { background: var(--amber); }
+.seg.ack-MISS, .sw.ack-MISS { background: var(--red); }
+.seg.ack-UNKNOWN { background: #2a3550; }
+.tl-times { font-size: 11px; color: var(--muted); overflow-wrap: anywhere; }
+.tl-axis { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+.leg-grid { display: grid; gap: 12px; grid-template-columns: 1fr; }
+.leg-d { background: var(--bg); border-radius: 8px; padding: 10px 12px; min-width: 0; }
+.leg-d h4 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; color: var(--text); }
+.leg-d .kv-row b { font-size: 13px; overflow-wrap: anywhere; text-align: right; }
+.x-lim summary { cursor: pointer; font-weight: 600; }
+.x-lim ul { margin: 10px 0 0; padding-left: 20px; display: grid; gap: 6px; font-size: 13px; overflow-wrap: anywhere; }
+.x-empty { color: var(--muted); font-size: 13px; }
+
 /* ---------- responsive ---------- */
 @media (min-width: 860px) {
   .grid-2 { grid-template-columns: 1fr 1fr; }
   .combos { grid-template-columns: 1fr 1fr; }
+  .x-grid { grid-template-columns: 1fr 1fr; }
+  .x-grid > .x-box.wide { grid-column: 1 / -1; }
+  .leg-grid { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 520px) {
   main { padding: 12px; }
@@ -455,6 +521,123 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     <p class="muted" style="margin-top:10px;font-size:12px">Click a row (or "Why?") to see the entry reason, real results on both venues and the outcome explanation.</p>
   </section>
 
+  <!-- ===== Execution realism (UK colocation study): hidden when the simulator is off ===== -->
+  <section class="panel" id="exec" aria-label="Execution realism (UK colocation study)" hidden>
+    <div class="panel-head">
+      <h2>Execution realism (UK colocation study)</h2>
+      <span class="muted" id="x-sub">—</span>
+    </div>
+
+    <div class="exec-strip" aria-label="Execution status">
+      <div class="x-chip" id="x-chip-profile">
+        <label>Latency profile</label>
+        <b id="x-profile">—</b>
+        <span class="x-note" id="x-profile-warn" hidden>using assumed latencies — run <code>bun run probe</code> on the UK server</span>
+      </div>
+      <div class="x-chip" id="x-chip-dk">
+        <label>Kalshi depth</label>
+        <b id="x-dk">—</b>
+        <span class="x-note" id="x-dk-note" hidden></span>
+      </div>
+      <div class="x-chip" id="x-chip-dp">
+        <label>Polymarket depth</label>
+        <b id="x-dp">—</b>
+        <span class="x-note" id="x-dp-note" hidden></span>
+      </div>
+      <div class="x-chip" id="x-chip-rec">
+        <label>Recorder</label>
+        <b id="x-rec">—</b>
+        <span class="x-note" id="x-rec-file">—</span>
+      </div>
+    </div>
+
+    <div class="x-grid">
+      <div class="x-box">
+        <h4>Opportunity lifetime</h4>
+        <div class="x-stats">
+          <span class="x-stat">p50<b id="x-p50">—</b></span>
+          <span class="x-stat">p95<b id="x-p95">—</b></span>
+          <span class="x-stat">p99<b id="x-p99">—</b></span>
+          <span class="x-stat">Episodes<b id="x-ep">—</b></span>
+          <span class="x-stat">Open<b id="x-open">—</b></span>
+        </div>
+        <div class="chart-box">
+          <canvas id="x-hist" aria-label="Opportunity lifetime histogram, log-ms bins"></canvas>
+          <div class="chart-empty" id="x-hist-empty">Waiting for episodes...</div>
+        </div>
+        <p class="muted x-foot">Histogram of recent closed episodes, in log-ms bins.</p>
+      </div>
+      <div class="x-box">
+        <h4>Survival: P(lifetime &gt; L)</h4>
+        <div class="chart-box">
+          <canvas id="x-surv" aria-label="Survival curve of opportunity lifetime"></canvas>
+          <div class="chart-empty" id="x-surv-empty">Waiting for episodes...</div>
+        </div>
+        <p class="muted x-foot">Share of episodes still alive after L ms, with markers at 5, 10, 20, 50, 100, 200 and 500 ms.</p>
+      </div>
+      <div class="x-box wide">
+        <h4>Killed by</h4>
+        <div class="chart-box">
+          <canvas id="x-kill" aria-label="Episodes by what ended them"></canvas>
+          <div class="chart-empty" id="x-kill-empty">No episodes yet</div>
+        </div>
+        <p class="muted x-foot">What ended each episode: a Kalshi or Polymarket leg disappearing, both, a stale quote, or a window rollover.</p>
+      </div>
+    </div>
+
+    <div class="x-box" style="margin-top:16px">
+      <h4>Strategy comparison</h4>
+      <div class="table-wrap">
+        <table class="exec-table">
+          <thead>
+            <tr>
+              <th>Strategy</th>
+              <th class="num">Attempts</th>
+              <th class="num">Kalshi fill</th>
+              <th class="num">Polymarket fill</th>
+              <th class="num">Both</th>
+              <th class="num">One leg</th>
+              <th class="num">None</th>
+              <th class="num">Kalshi fill ms</th>
+              <th class="num">Poly fill ms</th>
+              <th class="num">Both ms</th>
+              <th class="num">Exp PnL / attempt</th>
+              <th class="num">Avg slippage</th>
+            </tr>
+          </thead>
+          <tbody id="x-strat-body"></tbody>
+        </table>
+      </div>
+      <p class="muted x-foot">Time-to-fill columns read p50 / p95 / p99 in ms. The highest expected PnL per attempt is highlighted.</p>
+    </div>
+
+    <div class="x-box" style="margin-top:16px">
+      <h4>Fill rate vs assumed latency</h4>
+      <div class="chart-box">
+        <canvas id="x-lat" aria-label="Fill rate against assumed latency"></canvas>
+        <div class="chart-empty" id="x-lat-empty">No sweep yet. Run <code>bun run replay</code> to fill this in.</div>
+      </div>
+      <p class="muted x-foot">Both-legs and Kalshi-only fill rates when the assumed latency is swept. Colocation pays off where the both-legs curve stays high.</p>
+    </div>
+
+    <div class="x-box" style="margin-top:16px">
+      <div class="toolbar">
+        <div class="filters">
+          <label for="x-att-strat" style="margin:0">Strategy</label>
+          <select id="x-att-strat" aria-label="Strategy for the attempt list"></select>
+        </div>
+        <span class="muted" id="x-att-count">0 attempts</span>
+      </div>
+      <div id="x-attempts" aria-live="polite"></div>
+      <p class="muted x-foot">Click an attempt to see its timeline: decision, send, arrival and ack per leg, with the asks seen and at arrival.</p>
+    </div>
+
+    <details class="x-box x-lim" id="x-lim-wrap" style="margin-top:16px">
+      <summary>Limitations <span class="muted" id="x-lim-count"></span></summary>
+      <ul id="x-lim"></ul>
+    </details>
+  </section>
+
 </main>
 
 <script>
@@ -591,6 +774,7 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     renderCharts();
     renderEventFilter();
     renderTrades(false);
+    renderExec();
     tick();
   }
 
@@ -1162,6 +1346,491 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
   $("alerts-dismiss").addEventListener("click", () => {
     alertDismissedSig = alertSig;
     $("alerts").hidden = true;
+  });
+
+  // ---------- execution realism (UK colocation study) ----------
+  // Contract: S.exec is ExecState (src/exec/types.ts) or null. Rates are fractions (0..1),
+  // times are ms, prices are cents. Everything is null-safe: missing fields show a dash.
+  const X_EDGES = [0, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, Infinity];
+  const X_MARKERS = [5, 10, 20, 50, 100, 200, 500];
+  const X_KILL = ["kalshi", "poly", "both", "stale", "rollover"];
+  const X_KILL_LABEL = { kalshi: "Kalshi leg gone", poly: "Polymarket leg gone", both: "Both legs gone", stale: "Stale quote", rollover: "Window rollover" };
+  const X_KILL_COLOR = { kalshi: "#38bdf8", poly: "#f59e0b", both: "#ef4444", stale: "#8a96b0", rollover: "#a78bfa" };
+  const X_REASON = {
+    price_moved: "price moved", depth_consumed: "depth consumed", race_lost: "race lost",
+    no_book: "no book", below_min_size: "below min size", fok_incomplete: "FOK incomplete",
+  };
+  const X_DEPTH = { ws: "WebSocket", "rest-coarse": "REST (coarse)", none: "none" };
+  const X_LEG_TAG = { FILLED: "won", PARTIAL: "open", MISS: "lost" };
+  const X_OUTCOME_CLS = { BOTH: "ok", ONE: "one", NONE: "none" };
+  const X = {
+    ready: false,
+    charts: {},
+    expanded: new Set(),      // expanded attempt keys
+    strategy: null,           // strategy shown in the attempt list
+    userPicked: false,        // true once the user changes the strategy selector
+    focusKey: null,           // attempt header to re-focus after a keyboard toggle
+    html: { opts: "", strat: "", att: "", lim: "" },
+  };
+
+  const uniq = (arr) => [...new Set(arr)];
+  const xRate = (v) => (isNum(v) ? `${(v * 100).toFixed(1)}%` : DASH);
+  const xNum = (v) => (isNum(v) ? String(v >= 100 ? Math.round(v) : Math.round(v * 10) / 10) : DASH);
+  const xMs = (v) => (isNum(v) ? `${xNum(v)} ms` : DASH);
+  const xTrio = (d) => {
+    const vals = d && typeof d === "object" ? [d.p50, d.p95, d.p99] : [];
+    return vals.some(isNum) ? vals.map(xNum).join(" / ") : DASH;
+  };
+  const xCount = (v) => (isNum(v) ? Math.round(v).toLocaleString("en-US") : DASH);
+  const xSigned = (v) => (isNum(v) ? `${v > 0 ? "+" : ""}${Math.round(v * 10) / 10}¢` : DASH);
+  const xClock = (ms) => {
+    if (!isNum(ms)) return DASH;
+    const frac = String(Math.floor(((ms % 1000) + 1000) % 1000)).padStart(3, "0");
+    return `${new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.${frac}`;
+  };
+  const xRel = (t, t0) => (isNum(t) && isNum(t0) ? `+${xNum(t - t0)}` : DASH);
+  // decision time: the backend may add decisionAt; otherwise the first send is the decision
+  const xDecision = (a) => {
+    if (isNum(a.decisionAt)) return a.decisionAt;
+    const sent = [a.kalshi?.sentAt, a.poly?.sentAt].filter(isNum);
+    return sent.length ? Math.min(...sent) : null;
+  };
+  const xKv = (rows) => rows.map(([k, v]) => `<div class="kv-row"><span>${esc(k)}</span><b>${v}</b></div>`).join("");
+
+  function xBestIndex(rows) {
+    let best = -1;
+    rows.forEach((s, i) => {
+      if (isNum(s.expPnlPerAttemptUsd) && (best < 0 || s.expPnlPerAttemptUsd > rows[best].expPnlPerAttemptUsd)) best = i;
+    });
+    return best;
+  }
+
+  // Chart.js charts are created once, on first render with Chart.js loaded, then updated in place.
+  function ensureExecCharts() {
+    if (X.ready) return true;
+    if (!window.Chart) return false;
+    const grid = { color: "#1f2a40" };
+    X.charts.hist = new Chart($("x-hist"), {
+      type: "bar",
+      data: { labels: [], datasets: [{ label: "Episodes", data: [], backgroundColor: "#38bdf8", borderRadius: 3 }] },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { grid: { display: false }, ticks: { maxRotation: 45, autoSkip: false } },
+          y: { beginAtZero: true, grid, ticks: { precision: 0 } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            title: (it) => (it.length ? `${it[0].label} ms` : ""),
+            label: (c) => `${c.parsed.y} episodes`,
+          } },
+        },
+      },
+    });
+    X.charts.surv = new Chart($("x-surv"), {
+      type: "line",
+      data: { datasets: [{
+        label: "P(lifetime > L)", data: [], borderColor: "#22c55e", backgroundColor: "#22c55e",
+        borderWidth: 2, pointRadius: 4, pointHoverRadius: 6, tension: 0,
+      }] },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: {
+            type: "logarithmic", min: 1, max: 1000, grid,
+            ticks: {
+              autoSkip: false, maxRotation: 0,
+              callback: (v) => (X_MARKERS.includes(Math.round(v)) && Math.abs(v - Math.round(v)) < 1e-6 ? `${Math.round(v)} ms` : ""),
+            },
+          },
+          y: { min: 0, max: 100, grid, ticks: { callback: (v) => `${v}%` } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: {
+            title: (it) => (it.length ? `L = ${Math.round(it[0].parsed.x)} ms` : ""),
+            label: (c) => `P(lifetime > L) = ${Math.round(c.parsed.y * 10) / 10}%`,
+          } },
+        },
+      },
+    });
+    X.charts.kill = new Chart($("x-kill"), {
+      type: "bar",
+      data: { labels: [], datasets: [{ label: "Episodes", data: [], backgroundColor: [], borderRadius: 3 }] },
+      options: {
+        indexAxis: "y", animation: false, responsive: true, maintainAspectRatio: false,
+        scales: {
+          x: { beginAtZero: true, grid, ticks: { precision: 0 } },
+          y: { grid: { display: false } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: { callbacks: { label: (c) => `${c.parsed.x} episodes` } },
+        },
+      },
+    });
+    X.charts.lat = new Chart($("x-lat"), {
+      type: "line",
+      data: { datasets: [
+        { label: "Both legs filled", data: [], borderColor: "#22c55e", backgroundColor: "#22c55e", borderWidth: 2, pointRadius: 2, tension: 0.2, spanGaps: true },
+        { label: "Kalshi filled", data: [], borderColor: "#38bdf8", backgroundColor: "#38bdf8", borderWidth: 2, pointRadius: 2, tension: 0.2, spanGaps: true },
+      ] },
+      options: {
+        animation: false, responsive: true, maintainAspectRatio: false,
+        interaction: { mode: "nearest", intersect: false },
+        scales: {
+          x: { type: "linear", grid, title: { display: true, text: "assumed latency (ms)" }, ticks: { callback: (v) => `${v} ms` } },
+          y: { min: 0, max: 100, grid, ticks: { callback: (v) => `${v}%` } },
+        },
+        plugins: {
+          legend: { labels: { boxWidth: 12, boxHeight: 2 } },
+          tooltip: { callbacks: {
+            title: (it) => (it.length ? `latency ${it[0].parsed.x} ms` : ""),
+            label: (c) => `${c.dataset.label}: ${Math.round(c.parsed.y * 10) / 10}%`,
+          } },
+        },
+      },
+    });
+    X.ready = true;
+    return true;
+  }
+
+  function setExecEmpty(id, msg) {
+    const el = $(id);
+    if (!el) return;
+    el.textContent = msg || "";
+    el.hidden = !msg;
+  }
+
+  // Applies data to one chart; shows the overlay when there is nothing to draw.
+  function updateExecChart(key, emptyId, hasData, emptyMsg, apply) {
+    if (!ensureExecCharts()) {
+      setExecEmpty(emptyId, "Chart.js failed to load from the CDN");
+      return;
+    }
+    apply(X.charts[key]);
+    X.charts[key].update("none");
+    setExecEmpty(emptyId, hasData ? "" : emptyMsg);
+  }
+
+  function renderExec() {
+    const sec = $("exec");
+    if (!sec) return;
+    const E = S && S.exec && typeof S.exec === "object" ? S.exec : null;
+    sec.hidden = !E;
+    if (!E) return;
+    renderExecStrip(E);
+    renderExecLifetime(E);
+    renderExecStrategies(E);
+    renderExecLatency(E);
+    renderExecAttempts(E);
+    renderExecLimits(E);
+  }
+
+  function renderExecStrip(E) {
+    const ep = E.episodes || {};
+    setText("x-sub", `${E.enabled === false ? "simulator disabled" : "simulator on"} · ${xCount(ep.total)} episodes · ${xCount(ep.open)} open`);
+
+    // latency profile: 'default' means assumed latencies, so warn
+    const src = typeof E.profileSource === "string" ? E.profileSource : null;
+    const assumed = src === "default";
+    setText("x-profile", src ?? DASH);
+    $("x-chip-profile").classList.toggle("warn", assumed);
+    $("x-profile-warn").hidden = !assumed;
+
+    // depth quality per venue
+    const dq = E.depthQuality || {};
+    const kq = typeof dq.kalshi === "string" ? dq.kalshi : null;
+    const pq = typeof dq.polymarket === "string" ? dq.polymarket : null;
+    setText("x-dk", X_DEPTH[kq] ?? DASH);
+    setText("x-dk-note", kq === "rest-coarse" ? "coarse depth: Kalshi episode lifetimes biased long"
+      : kq === "none" ? "no Kalshi depth: Kalshi legs cannot be simulated" : "");
+    $("x-dk-note").hidden = !(kq === "rest-coarse" || kq === "none");
+    $("x-chip-dk").classList.toggle("warn", kq === "rest-coarse");
+    $("x-chip-dk").classList.toggle("bad", kq === "none");
+
+    setText("x-dp", pq === "ws" ? "WebSocket" : pq === "none" ? "none" : (pq ?? DASH));
+    setText("x-dp-note", pq === "none" ? "no Polymarket depth: Polymarket legs cannot be simulated" : "");
+    $("x-dp-note").hidden = pq !== "none";
+    $("x-chip-dp").classList.toggle("bad", pq === "none");
+
+    // recorder
+    const rec = E.recorder || {};
+    setText("x-rec", rec.enabled ? `${xCount(rec.msgs)} msgs` : "off");
+    const mb = isNum(rec.bytes) ? `${(rec.bytes / 1048576).toFixed(1)} MB` : DASH;
+    setText("x-rec-file", rec.enabled ? `${mb} · ${rec.file || DASH}` : "not recording (RECORD_MD=0)");
+  }
+
+  function renderExecLifetime(E) {
+    const ep = E.episodes || {};
+    const d = ep.durationMs || {};
+    setText("x-p50", xMs(d.p50));
+    setText("x-p95", xMs(d.p95));
+    setText("x-p99", xMs(d.p99));
+    setText("x-ep", xCount(ep.total));
+    setText("x-open", xCount(ep.open));
+
+    // histogram of closed episodes in the recent list, log-ms bins
+    const recent = Array.isArray(ep.recent) ? ep.recent : [];
+    const durs = recent.map((e) => e?.durationMs).filter((v) => isNum(v) && v >= 0);
+    const nBins = X_EDGES.length - 1;
+    const counts = new Array(nBins).fill(0);
+    for (const v of durs) {
+      let i = 0;
+      while (i < nBins - 1 && v >= X_EDGES[i + 1]) i++;
+      counts[i]++;
+    }
+    const labels = counts.map((_, i) => (i === nBins - 1 ? `≥${X_EDGES[i]}` : `${X_EDGES[i]}–${X_EDGES[i + 1]}`));
+    updateExecChart("hist", "x-hist-empty", durs.length > 0, "No closed episodes in the recent list yet", (c) => {
+      c.data.labels = labels;
+      c.data.datasets[0].data = counts;
+    });
+
+    // survival curve P(lifetime > L) at the L markers
+    const surv = (Array.isArray(ep.survival) ? ep.survival : [])
+      .filter((p) => isNum(p?.ms) && p.ms > 0 && isNum(p?.share))
+      .sort((a, b) => a.ms - b.ms);
+    updateExecChart("surv", "x-surv-empty", surv.length > 0, "No survival data yet", (c) => {
+      c.data.datasets[0].data = surv.map((p) => ({ x: p.ms, y: p.share * 100 }));
+    });
+
+    // killed-by split (zero for kinds the backend did not report)
+    const kb = ep.killedBy && typeof ep.killedBy === "object" ? ep.killedBy : {};
+    const keys = uniq([...X_KILL, ...Object.keys(kb)]);
+    const vals = keys.map((k) => (isNum(kb[k]) ? kb[k] : 0));
+    const total = vals.reduce((a, b) => a + b, 0);
+    updateExecChart("kill", "x-kill-empty", total > 0, "No episodes have ended yet", (c) => {
+      c.data.labels = keys.map((k) => X_KILL_LABEL[k] ?? k);
+      c.data.datasets[0].data = vals;
+      c.data.datasets[0].backgroundColor = keys.map((k) => X_KILL_COLOR[k] ?? "#8a96b0");
+    });
+  }
+
+  function renderExecStrategies(E) {
+    const rows = (Array.isArray(E.strategies) ? E.strategies : []).filter((s) => s && typeof s === "object");
+    const best = xBestIndex(rows);
+    const html = rows.length
+      ? rows.map((s, i) => {
+        const isBest = i === best;
+        return `<tr class="${isBest ? "best" : ""}">
+          <th>${esc(s.strategy ?? DASH)}${isBest ? ' <span class="badge ok">best</span>' : ""}</th>
+          <td class="num">${xCount(s.attempts)}</td>
+          <td class="num">${xRate(s.kalshiFillRate)}</td>
+          <td class="num">${xRate(s.polyFillRate)}</td>
+          <td class="num">${xRate(s.bothRate)}</td>
+          <td class="num">${xRate(s.oneLegRate)}</td>
+          <td class="num">${xRate(s.noneRate)}</td>
+          <td class="num trio">${xTrio(s.kalshiFillMs)}</td>
+          <td class="num trio">${xTrio(s.polyFillMs)}</td>
+          <td class="num trio">${xTrio(s.bothMs)}</td>
+          <td class="num ${signCls(s.expPnlPerAttemptUsd)}">${fmtMoney(s.expPnlPerAttemptUsd)}</td>
+          <td class="num">${fmtCents(s.avgSlippageCents)}</td>
+        </tr>`;
+      }).join("")
+      : `<tr><td colspan="12" class="empty">No strategy statistics yet</td></tr>`;
+    if (html === X.html.strat) return;
+    X.html.strat = html;
+    $("x-strat-body").innerHTML = html;
+  }
+
+  function renderExecLatency(E) {
+    const pts = (Array.isArray(E.fillLatencyCurve) ? E.fillLatencyCurve : [])
+      .filter((p) => p && isNum(p.latencyMs))
+      .sort((a, b) => a.latencyMs - b.latencyMs);
+    updateExecChart("lat", "x-lat-empty", pts.length > 0,
+      "No sweep yet. Run `bun run replay` to fill this in.", (c) => {
+        c.data.datasets[0].data = pts.filter((p) => isNum(p.bothRate)).map((p) => ({ x: p.latencyMs, y: p.bothRate * 100 }));
+        c.data.datasets[1].data = pts.filter((p) => isNum(p.kalshiFillRate)).map((p) => ({ x: p.latencyMs, y: p.kalshiFillRate * 100 }));
+      });
+  }
+
+  function renderExecLimits(E) {
+    const lim = (Array.isArray(E.limitations) ? E.limitations : []).filter((v) => typeof v === "string" && v);
+    setText("x-lim-count", `(${lim.length})`);
+    const html = lim.length ? lim.map((v) => `<li>${esc(v)}</li>`).join("") : `<li class="muted">No limitations listed</li>`;
+    if (html === X.html.lim) return;
+    X.html.lim = html;
+    $("x-lim").innerHTML = html;
+  }
+
+  // ----- attempts: strategy picker, per-trade timeline -----
+  const xAttKey = (a) => `${a.strategy ?? ""}|${a.kalshi?.sentAt ?? ""}|${a.poly?.sentAt ?? ""}|${a.kalshi?.side ?? ""}|${a.poly?.side ?? ""}`;
+
+  function xLegTag(l) {
+    if (!l || typeof l !== "object") return `<span class="muted">no data</span>`;
+    const st = typeof l.status === "string" ? l.status : DASH;
+    const reason = l.missReason ? ` <span class="tag lost">${esc(X_REASON[l.missReason] ?? l.missReason)}</span>` : "";
+    const qty = isNum(l.qty) ? `<span class="mono muted">${xNum(l.qty)} @ ${isNum(l.vwap) ? fmtCents(l.vwap) : DASH}</span>` : "";
+    return `<span class="tag ${X_LEG_TAG[st] ?? "settled"}">${esc(st)}</span> ${qty}${reason}`;
+  }
+
+  function xLegShort(tag, l) {
+    if (!l || typeof l !== "object") return `${tag} ${DASH}`;
+    const st = typeof l.status === "string" ? l.status : DASH;
+    const qty = isNum(l.qty) ? ` ${xNum(l.qty)}@${isNum(l.vwap) ? xNum(l.vwap) + "¢" : DASH}` : "";
+    const reason = l.missReason ? ` (${esc(X_REASON[l.missReason] ?? l.missReason)})` : "";
+    return `${tag} <span class="tag ${X_LEG_TAG[st] ?? "settled"}">${esc(st)}</span><span class="mono muted">${esc(qty)}</span>${reason}`;
+  }
+
+  function xAskLine(l) {
+    const seen = isNum(l.seenAsk) ? l.seenAsk : null;
+    const arr = isNum(l.arrivalAsk) ? l.arrivalAsk : null;
+    if (seen == null && arr == null) return DASH;
+    const d = seen != null && arr != null ? arr - seen : null;
+    // for a buyer, a higher ask at arrival is worse
+    const cls = d == null || d === 0 ? "" : d > 0 ? "neg" : "pos";
+    const delta = d == null ? "" : ` <span class="${cls}">(${d > 0 ? "+" : ""}${Math.round(d * 10) / 10}¢)</span>`;
+    return `seen ${fmtCents(seen)} → arrival ${fmtCents(arr)}${delta}`;
+  }
+
+  function xLegDetail(name, l) {
+    if (!l || typeof l !== "object") return `<div class="leg-d"><h4>${esc(name)}</h4><p class="x-empty">no leg data</p></div>`;
+    const st = typeof l.status === "string" ? l.status : DASH;
+    const miss = l.missReason ? esc(X_REASON[l.missReason] ?? l.missReason) : "—";
+    return `<div class="leg-d">
+      <h4>${esc(name)} <span class="tag ${X_LEG_TAG[st] ?? "settled"}">${esc(st)}</span></h4>
+      ${xKv([
+        ["Side", esc(l.side ?? DASH)],
+        ["Filled", isNum(l.qty) ? `${xCount(l.qty)} @ VWAP ${fmtCents(l.vwap)}` : DASH],
+        ["Fee", isNum(l.fee) ? `${xNum(l.fee)}¢` : DASH],
+        ["Ask seen → at arrival", xAskLine(l)],
+        ["Miss reason", miss],
+      ])}
+    </div>`;
+  }
+
+  function xTimeline(a) {
+    const t0 = xDecision(a);
+    const legs = [["Kalshi", a.kalshi], ["Polymarket", a.poly]];
+    const pts = legs.flatMap(([, l]) => [l?.sentAt, l?.arriveAt, l?.ackAt]).filter(isNum);
+    if (t0 == null || !pts.length) return `<p class="x-empty">No leg timing recorded for this attempt.</p>`;
+    const span = Math.max(1, Math.max(...pts) - t0);
+    const at = (t) => Math.max(0, Math.min(100, ((t - t0) / span) * 100));
+    const seg = (cls, from, to, label) => {
+      if (!isNum(from) || !isNum(to) || to <= from) return "";
+      const l = at(from);
+      const w = Math.max(0.5, at(to) - l);
+      return `<i class="seg ${cls}" style="left:${l.toFixed(2)}%;width:${w.toFixed(2)}%" title="${esc(label)}"></i>`;
+    };
+    const rows = legs.map(([name, l]) => {
+      const st = ["FILLED", "PARTIAL", "MISS"].includes(l?.status) ? l.status : "UNKNOWN";
+      return `<div class="tl-row">
+        <div class="tl-name"><b>${name}</b> ${xLegTag(l)}</div>
+        <div class="tl-track" role="img" aria-label="${name}: decision to send to arrival to ack">
+          ${seg("wait", t0, l?.sentAt, "decision → send")}
+          ${seg("fly", l?.sentAt, l?.arriveAt, "send → arrive")}
+          ${seg(`ack ack-${st}`, l?.arriveAt, l?.ackAt, "arrive → ack")}
+        </div>
+        <div class="tl-times mono">send ${xRel(l?.sentAt, t0)} · arrive ${xRel(l?.arriveAt, t0)} · ack ${xRel(l?.ackAt, t0)} ms</div>
+      </div>`;
+    }).join("");
+    return `<div class="tl">
+      <div class="tl-legend">
+        <span><i class="sw wait"></i>decision → send (waiting)</span>
+        <span><i class="sw fly"></i>send → arrive (network)</span>
+        <span><i class="sw ack-FILLED"></i>arrive → ack, FILLED</span>
+        <span><i class="sw ack-PARTIAL"></i>PARTIAL</span>
+        <span><i class="sw ack-MISS"></i>MISS</span>
+      </div>
+      ${rows}
+      <div class="tl-axis mono"><span>decision ${xClock(t0)}</span><span>span ${xMs(span)}</span></div>
+    </div>`;
+  }
+
+  function xAttemptHtml(a) {
+    const key = xAttKey(a);
+    const open = X.expanded.has(key);
+    const k = a.kalshi && typeof a.kalshi === "object" ? a.kalshi : {};
+    const p = a.poly && typeof a.poly === "object" ? a.poly : {};
+    const outcome = typeof a.outcome === "string" ? a.outcome : null;
+    const t0 = xDecision(a);
+    const ttb = isNum(a.timeToBothMs) ? `both in ${xMs(a.timeToBothMs)}` : "not both";
+    const unwind = a.unwound ? `<span class="mono ${signCls(a.unwindPnlCents)}">unwind ${xSigned(a.unwindPnlCents)}</span>` : "";
+    const body = open ? `<div class="att-body">
+        ${xTimeline(a)}
+        <div class="leg-grid">${xLegDetail("Kalshi", k)}${xLegDetail("Polymarket", p)}</div>
+        <div>${xKv([
+          ["Hedged qty", xCount(a.hedgedQty)],
+          ["Time to both legs", isNum(a.timeToBothMs) ? xMs(a.timeToBothMs) : DASH],
+          ["Retried hedge", a.retried ? "yes" : "no"],
+          ["Unwound", a.unwound ? "yes" : "no"],
+          ["Unwind PnL", a.unwound ? xSigned(a.unwindPnlCents) : DASH],
+        ])}</div>
+      </div>` : "";
+    return `<div class="att${open ? " open" : ""}">
+      <div class="att-head" role="button" tabindex="0" aria-expanded="${open}" data-key="${esc(key)}">
+        <span class="mono muted">${xClock(t0)}</span>
+        <span class="badge ${X_OUTCOME_CLS[outcome] ?? "off"}">${esc(outcome ?? DASH)}</span>
+        <span class="att-legs">${xLegShort("K", k)} · ${xLegShort("P", p)}</span>
+        <span class="mono muted">${ttb}</span>
+        ${unwind}
+      </div>${body}
+    </div>`;
+  }
+
+  function renderExecAttempts(E) {
+    const all = (Array.isArray(E.recentAttempts) ? E.recentAttempts : []).filter((a) => a && typeof a === "object");
+    const strategies = uniq([
+      ...(Array.isArray(E.strategies) ? E.strategies : []).map((s) => s?.strategy),
+      ...all.map((a) => a.strategy),
+    ].filter((v) => typeof v === "string" && v));
+
+    // default to the best strategy until the user picks one
+    const rows = (Array.isArray(E.strategies) ? E.strategies : []).filter((s) => s && typeof s === "object");
+    const bi = xBestIndex(rows);
+    const best = bi >= 0 ? rows[bi].strategy ?? null : null;
+    if (!X.userPicked || !strategies.includes(X.strategy)) X.strategy = best && strategies.includes(best) ? best : strategies[0] ?? null;
+
+    const sel = $("x-att-strat");
+    const opts = strategies.map((s) => `<option value="${esc(s)}">${esc(s)}</option>`).join("");
+    if (X.html.opts !== opts) {
+      X.html.opts = opts;
+      sel.innerHTML = opts;
+    }
+    if (X.strategy && sel.value !== X.strategy) sel.value = X.strategy;
+
+    const list = all.filter((a) => a.strategy === X.strategy).slice(0, 50);
+    setText("x-att-count", `${list.length} attempt${list.length === 1 ? "" : "s"} shown`);
+    const html = list.length
+      ? list.map(xAttemptHtml).join("")
+      : `<p class="x-empty">No attempts for this strategy yet.</p>`;
+    if (html !== X.html.att) {
+      X.html.att = html;
+      $("x-attempts").innerHTML = html;
+    }
+    if (X.focusKey) {
+      const key = X.focusKey;
+      X.focusKey = null;
+      [...$("x-attempts").querySelectorAll(".att-head")].find((el) => el.dataset.key === key)?.focus();
+    }
+  }
+
+  function xToggleAttempt(key) {
+    if (!key) return;
+    if (X.expanded.has(key)) X.expanded.delete(key);
+    else X.expanded.add(key);
+    X.html.att = "";
+    if (S?.exec) renderExecAttempts(S.exec);
+  }
+
+  $("x-attempts").addEventListener("click", (e) => {
+    const h = e.target.closest ? e.target.closest(".att-head") : null;
+    if (h) xToggleAttempt(h.dataset.key);
+  });
+  $("x-attempts").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const h = e.target.closest ? e.target.closest(".att-head") : null;
+    if (!h) return;
+    e.preventDefault();
+    X.focusKey = h.dataset.key;
+    xToggleAttempt(h.dataset.key);
+  });
+  $("x-att-strat").addEventListener("change", (e) => {
+    X.strategy = e.target.value || null;
+    X.userPicked = true;
+    X.html.att = "";
+    if (S?.exec) renderExecAttempts(S.exec);
   });
 
   initCharts();
