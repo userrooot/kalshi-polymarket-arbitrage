@@ -59,7 +59,7 @@ Prices are in cents (66¢ = $0.66 per contract). Money uses signed notation such
 
 - **Polymarket spot** is Chainlink BTC/USD, streamed through the Polymarket RTDS websocket. Polymarket resolves on this feed.
 - **Kalshi** resolves on the CF Benchmarks BRTI index. BRTI has no free live feed, so the dashboard shows a median of constituent-exchange mids as an approximation (expect about ±$3 versus the index). The 60s average on each panel is the settlement estimate.
-- **Up/Down prices** for Polymarket are pushed over the CLOB websocket. For Kalshi they come from REST polling every `KALSHI_BOOK_POLL_MS` (250 ms by default), unless a Kalshi API key websocket is configured.
+- **Up/Down prices** for Polymarket are pushed over the CLOB websocket. For Kalshi they come from REST polling every `KALSHI_BOOK_POLL_MS` (350 ms by default), unless a Kalshi API key websocket is configured.
 - Each panel shows where its quotes came from (`WS push` or `REST`) and how old they are. A spot price older than 5 s is grayed out and marked stale. The Feeds strip shows each feed's status, message rate and last-message age, plus tick and broadcast rates.
 
 ## Configuration
