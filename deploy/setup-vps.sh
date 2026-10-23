@@ -9,6 +9,8 @@ log() { printf '\n== %s ==\n' "$*"; }
 warn() { printf 'WARNING: %s\n' "$*" >&2; }
 
 [ -d "$APP" ] || { echo "$APP not found; run deploy.ps1/deploy.sh first" >&2; exit 1; }
+# Files packed on Windows may have CRLF endings (this script itself is fixed by deploy.* before it runs).
+sed -i 's/\r$//' "$APP"/deploy/*.sh "$APP"/deploy/btcarb.service
 
 log "apt packages"
 sudo apt-get update -y
@@ -43,15 +45,17 @@ fi
 cd "$APP"
 
 log ".env"
-if [ ! -f .env ]; then
+( umask 077; [ -f .env ] || : > .env )
+if [ ! -s .env ]; then
   if [ -f .env.example ]; then
-    cp .env.example .env
+    cat .env.example > .env
     warn "no .env uploaded; created from .env.example (no Kalshi keys: Kalshi WS feed disabled)"
   else
-    : > .env
-    warn "no .env and no .env.example; created empty .env"
+    warn "no .env and no .env.example; using an empty .env"
   fi
 fi
+chmod 600 .env
+sed -i 's/\r$//' .env  # CRLF from Windows editors (in place, keeps mode 600)
 
 # Set KEY=VALUE in .env in place, without printing the value. Uses awk so values need no escaping.
 set_env() {
@@ -71,7 +75,9 @@ set_env RECORD_MD 1
 set_env HOST 127.0.0.1
 if [ -d secrets ]; then
   chmod 700 secrets
-  pem="$(find secrets -maxdepth 1 -type f -name '*.pem' | sort | head -n1 || true)"
+  find secrets -maxdepth 1 -type f -exec chmod 600 {} +
+  # newest upload wins if several PEMs accumulated over deploys
+  pem="$(find secrets -maxdepth 1 -type f -name '*.pem' -printf '%T@ %p\n' | sort -rn | head -n1 | cut -d' ' -f2- || true)"
   if [ -n "$pem" ]; then
     chmod 600 "$pem"
     set_env KALSHI_PRIVATE_KEY_PATH "./$pem"
@@ -104,7 +110,10 @@ mkdir -p data
 "$BUN" run probe --no-demo || warn "probe failed; continuing (data/latency.json may be missing)"
 
 log "systemd unit"
-sudo install -m 644 deploy/btcarb.service /etc/systemd/system/btcarb.service
+# The unit is written for user "ubuntu"; adapt it if this account differs.
+sed -e "s#/home/ubuntu#$HOME#g" -e "s#^User=ubuntu\$#User=$(id -un)#" deploy/btcarb.service \
+  | sudo tee /etc/systemd/system/btcarb.service >/dev/null
+sudo chmod 644 /etc/systemd/system/btcarb.service
 sudo systemctl daemon-reload
 sudo systemctl enable btcarb
 if systemctl is-active --quiet btcarb; then

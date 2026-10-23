@@ -44,17 +44,18 @@ fi
 
 echo
 echo "== Instance region (IMDSv2, optional) =="
-tok=$(curl -sS --max-time 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null || true)
+tok=$(curl -fsS --max-time 2 -X PUT http://169.254.169.254/latest/api/token -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' 2>/dev/null || true)
 if [ -n "$tok" ]; then
-  echo "region: $(curl -sS --max-time 2 -H "X-aws-ec2-metadata-token: $tok" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || echo unknown)"
-  echo "az:     $(curl -sS --max-time 2 -H "X-aws-ec2-metadata-token: $tok" http://169.254.169.254/latest/meta-data/placement/availability-zone 2>/dev/null || echo unknown)"
+  echo "region: $(curl -fsS --max-time 2 -H "X-aws-ec2-metadata-token: $tok" http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || echo unknown)"
+  echo "az:     $(curl -fsS --max-time 2 -H "X-aws-ec2-metadata-token: $tok" http://169.254.169.254/latest/meta-data/placement/availability-zone 2>/dev/null || echo unknown)"
 else
   echo "not an EC2 instance, or IMDS unreachable (ignored)"
 fi
 
 echo
 echo "== Polymarket geoblock check (UNVERIFIED endpoint - verify in docs) =="
-curl -sS --max-time 10 -w '\n[HTTP %{http_code}]\n' https://polymarket.com/api/geoblock 2>&1 || echo "request failed"
+gb=$(mktemp); gcode=$(curl -sS --max-time 10 -o "$gb" -w '%{http_code}' https://polymarket.com/api/geoblock 2>/dev/null) || gcode="request failed"
+head -c 400 "$gb"; echo; echo "[HTTP $gcode]"; rm -f "$gb"
 echo "This endpoint is not confirmed; verify in the Polymarket docs before relying on the response."
 
 cat <<'M'

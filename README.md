@@ -206,14 +206,20 @@ Runs the bot on an EC2 instance in London to measure latency to Polymarket and K
 From the repo root, in PowerShell:
 
 ```powershell
-.\deploy\deploy.ps1 -Key "C:\path\to\bot-uk-key.pem" -KalshiPem ".\kalshi_private_key.pem"
+.\deploy\deploy.ps1 -HostName <YOUR-EC2-HOST> -Key "C:\path\to\bot-uk-key.pem" -KalshiPem ".\kalshi_private_key.pem"
 ```
+
+If PowerShell refuses to run scripts ("running scripts is disabled on this system"), use
+`powershell -ExecutionPolicy Bypass -File .\deploy\deploy.ps1 -HostName ...` instead. You can also set
+`$env:BTCARB_HOST` once instead of passing `-HostName` every time.
 
 From bash (WSL, Linux or macOS):
 
 ```bash
-./deploy/deploy.sh --key /path/to/bot-uk-key.pem --kalshi-pem ./kalshi_private_key.pem
+./deploy/deploy.sh --host <YOUR-EC2-HOST> --key /path/to/bot-uk-key.pem --kalshi-pem ./kalshi_private_key.pem
 ```
+
+On WSL, copy the key into the Linux filesystem first (e.g. `~/.ssh/`): `chmod 600` has no effect on `/mnt/c`, and ssh refuses the key.
 
 To preview the commands without running them, add `-DryRun` (PowerShell) or `--dry-run` (bash).
 
@@ -225,7 +231,7 @@ The script does this:
 4. Runs `deploy/setup-vps.sh` on the VPS. It is safe to re-run. It:
    - installs `chrony`, `curl`, `unzip` and `git`, and syncs the clock to the Amazon Time Sync Service (`169.254.169.123`);
    - installs Bun if missing, then runs `bun install --frozen-lockfile`;
-   - sets `KALSHI_PRIVATE_KEY_PATH` in the VPS `.env`;
+   - sets `KALSHI_PRIVATE_KEY_PATH` (newest uploaded PEM), `HOST=127.0.0.1` and `RECORD_MD=1` in the VPS `.env` (other values are kept);
    - runs `bun run probe`, which writes `data/latency.json`;
    - installs and starts the `btcarb` systemd service.
 5. Prints the SSH tunnel command for the dashboard.
@@ -235,7 +241,7 @@ The script does this:
 The dashboard listens only on the VPS's localhost. Open a tunnel from your PC and keep the window open:
 
 ```bash
-ssh -i /path/to/bot-uk-key.pem -L 3000:localhost:3000 ubuntu@<YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com
+ssh -i /path/to/bot-uk-key.pem -L 3000:localhost:3000 ubuntu@<YOUR-EC2-HOST>
 ```
 
 Then open http://localhost:3000 in your browser.
@@ -266,14 +272,14 @@ bun run probe                                  # measures round-trip times, writ
 bun run replay --lat-k 5..300 --lat-p 5..50    # replays recorded data, writes a CSV
 ```
 
-Replay needs recorded data. Set `RECORD_MD=1` in the VPS `.env`, restart the service, and let it run for days.
+Replay needs recorded data. The deploy turns on `RECORD_MD=1` in the VPS `.env`; let the service run for days. Recordings are capped by `MD_RETENTION_GB` (default 20 GB): check the disk size with `df -h ~` and lower it (or enlarge the EBS volume) if the root volume is smaller, e.g. the 8 GB default.
 
 On your PC, from the repo root:
 
 ```bash
 mkdir -p data
-scp -i /path/to/bot-uk-key.pem ubuntu@<YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com:~/btcarb/data/latency.json ./data/
-scp -r -i /path/to/bot-uk-key.pem ubuntu@<YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com:~/btcarb/data/md ./data/
+scp -i /path/to/bot-uk-key.pem ubuntu@<YOUR-EC2-HOST>:~/btcarb/data/latency.json ./data/
+scp -r -i /path/to/bot-uk-key.pem ubuntu@<YOUR-EC2-HOST>:~/btcarb/data/md ./data/
 ```
 
 ### Clock sync
@@ -292,7 +298,7 @@ The offset (`System time` line) should be about 1 ms or less. `chronyc sources` 
   ```powershell
   icacls "C:\path\to\bot-uk-key.pem" /inheritance:r /grant:r "$($env:USERNAME):R"
   ```
-- **Host key prompt** (`Are you sure you want to continue connecting`): this is the first connection to the server. Answer `yes` only if you expect this instance. If the warning says the host key changed after a rebuild, run `ssh-keygen -R <YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com` and deploy again.
+- **Host key prompt** (`Are you sure you want to continue connecting`): this is the first connection to the server. Answer `yes` only if you expect this instance. If the warning says the host key changed after a rebuild, run `ssh-keygen -R <YOUR-EC2-HOST>` and deploy again.
 - **Port 3000 already in use on your PC**: tunnel to another port, `-L 3001:localhost:3000`, and open http://localhost:3001. **On the VPS**, if `btcarb` fails with "address in use", run `sudo ss -ltnp | grep 3000` and stop the other process.
 - **Kalshi 401 or failed authentication**: the red alert banner on the dashboard names the problem (see [Reading the dashboard](#reading-the-dashboard)). Check `KALSHI_API_KEY_ID` in your local `.env` and that the PEM matches that key. Fix them on your PC, then deploy again.
 

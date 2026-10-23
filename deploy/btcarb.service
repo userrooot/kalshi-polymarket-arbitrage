@@ -7,7 +7,9 @@ Wants=network-online.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/btcarb
-EnvironmentFile=/home/ubuntu/btcarb/.env
+# No EnvironmentFile: Bun loads .env from WorkingDirectory itself (dotenv syntax: quotes, inline
+# "# comments", \n escapes). systemd's EnvironmentFile parses those differently and its values would
+# take precedence over .env in Bun, so it is deliberately not used.
 ExecStart=/home/ubuntu/.bun/bin/bun run src/index.ts
 Restart=always
 RestartSec=3
@@ -16,13 +18,13 @@ LimitNOFILE=65536
 StandardOutput=journal
 StandardError=journal
 
-# Hardening. ProtectHome=read-only keeps /home/ubuntu readable (bun runs from ~/.bun, only
-# executed/read) while writes are limited to ReadWritePaths. If bun ever fails to start
-# under this sandbox, change ProtectHome to "false" (and drop ReadWritePaths).
+# Hardening. ProtectHome=read-only keeps /home/ubuntu readable while writes are limited to
+# ReadWritePaths: the app dir (data/, sqlite, recordings) and ~/.bun (Bun's install/transpiler cache).
+# If bun ever fails to start under this sandbox, change ProtectHome to "false".
 NoNewPrivileges=true
 ProtectSystem=full
 ProtectHome=read-only
-ReadWritePaths=/home/ubuntu/btcarb
+ReadWritePaths=/home/ubuntu/btcarb /home/ubuntu/.bun
 PrivateTmp=true
 
 [Install]

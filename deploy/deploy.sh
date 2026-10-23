@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Deploy the bot to the VPS from your machine (WSL/macOS/Linux). Run from the repo root.
-# Usage: bash deploy/deploy.sh --key ./bot-uk-key.pem [--host H] [--user U] [--env-file .env]
-#                              [--kalshi-pem path] [--dry-run] [--skip-tests]
+# Usage: bash deploy/deploy.sh --key ./bot-uk-key.pem --host <EC2 public DNS> [--user U] [--env-file .env]
+#                              [--kalshi-pem path] [--dry-run] [--skip-tests]   (or set BTCARB_HOST)
 set -euo pipefail
 
-KEY=""; HOST="ec2-51-24-240-139.eu-west-2.compute.amazonaws.com"; USER_NAME="ubuntu"
+KEY=""; HOST="${BTCARB_HOST:-}"; USER_NAME="ubuntu"
 ENV_FILE=".env"; KALSHI_PEM=""; DRY=0; SKIP_TESTS=0
 
 while [ $# -gt 0 ]; do
@@ -28,6 +28,7 @@ if [ -z "$KEY" ]; then
   if [ "$DRY" = 1 ]; then KEY=./bot-uk-key.pem; else read -r -p "Path to SSH key (bot-uk-key.pem): " KEY; fi
 fi
 [ -f package.json ] && [ -d deploy ] || { echo "run from the repo root" >&2; exit 1; }
+[ -n "$HOST" ] || { echo "missing --host <EC2 public DNS> (or set BTCARB_HOST)" >&2; exit 2; }
 if [ "$DRY" = 0 ]; then
   [ -f "$KEY" ] || { echo "key not found: $KEY" >&2; exit 1; }
   [ -f "$ENV_FILE" ] || echo "WARNING: $ENV_FILE not found; the VPS will use .env.example (no Kalshi keys)" >&2
@@ -52,14 +53,14 @@ if [ "$DRY" = 0 ]; then
   git ls-files -co --exclude-standard -z \
     | tr '\0' '\n' \
     | grep -vE '^(\.git/|node_modules/|data/|secrets/)|(^|/)\.env$|\.pem$' > "$TMP/files.txt"
-  tar -czf "$ARCHIVE" -T "$TMP/files.txt"
+  COPYFILE_DISABLE=1 tar -czf "$ARCHIVE" -T "$TMP/files.txt"  # COPYFILE_DISABLE: no macOS ._ files
   echo "archive: $(du -h "$ARCHIVE" | cut -f1)"
 fi
 
 echo "== upload and extract (existing data/ and .env are preserved) =="
-run ssh "${SSH_OPTS[@]}" "$TARGET" "mkdir -p ~/btcarb ~/btcarb/data ~/btcarb/secrets && chmod 700 ~/btcarb/secrets"
+run ssh "${SSH_OPTS[@]}" "$TARGET" "mkdir -p ~/btcarb ~/btcarb/data ~/btcarb/secrets && chmod 700 ~/btcarb/secrets && { [ -f ~/btcarb/.env ] || install -m 600 /dev/null ~/btcarb/.env; }"
 run scp "${SSH_OPTS[@]}" "$ARCHIVE" "$TARGET:/tmp/btcarb.tar.gz"
-run ssh "${SSH_OPTS[@]}" "$TARGET" "tar -xzf /tmp/btcarb.tar.gz -C ~/btcarb && rm -f /tmp/btcarb.tar.gz && chmod +x ~/btcarb/deploy/*.sh"
+run ssh "${SSH_OPTS[@]}" "$TARGET" "tar -xzf /tmp/btcarb.tar.gz -C ~/btcarb && rm -f /tmp/btcarb.tar.gz && sed -i 's/\r\$//' ~/btcarb/deploy/*.sh ~/btcarb/deploy/*.service && chmod +x ~/btcarb/deploy/*.sh"
 
 echo "== secrets (contents never printed) =="
 if [ -f "$ENV_FILE" ] || [ "$DRY" = 1 ]; then

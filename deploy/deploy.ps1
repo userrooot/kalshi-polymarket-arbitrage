@@ -2,13 +2,14 @@
 .SYNOPSIS
   Deploy the bot to the VPS from Windows. Run from the repo root.
 .EXAMPLE
-  .\deploy\deploy.ps1 -Key C:\path\bot-uk-key.pem -KalshiPem C:\path\kalshi.pem
-  .\deploy\deploy.ps1 -DryRun
+  .\deploy\deploy.ps1 -HostName ec2-x-x-x-x.eu-west-2.compute.amazonaws.com -Key C:\path\bot-uk-key.pem -KalshiPem C:\path\kalshi.pem
+  .\deploy\deploy.ps1 -HostName <host> -DryRun
+  (-HostName may be omitted if $env:BTCARB_HOST is set)
 #>
 [CmdletBinding()]
 param(
   [string]$Key,
-  [string]$HostName = 'ec2-51-24-240-139.eu-west-2.compute.amazonaws.com',
+  [string]$HostName = $env:BTCARB_HOST,
   [string]$User = 'ubuntu',
   [string]$EnvFile = '.env',
   [string]$KalshiPem,
@@ -20,8 +21,9 @@ $ErrorActionPreference = 'Stop'
 if (-not $Key) {
   if (Test-Path '.\bot-uk-key.pem') { $Key = (Resolve-Path '.\bot-uk-key.pem').Path }
   elseif ($DryRun) { $Key = '.\bot-uk-key.pem' }
-  else { $Key = Read-Host 'Path to SSH key (bot-uk-key.pem)' }
+  else { $Key = (Read-Host 'Path to SSH key (bot-uk-key.pem)').Trim().Trim('"') }
 }
+if (-not $HostName) { throw 'Missing -HostName <EC2 public DNS> (or set $env:BTCARB_HOST).' }
 if (-not ((Test-Path 'package.json') -and (Test-Path 'deploy'))) { throw 'Run from the repo root.' }
 if (-not $DryRun) {
   if (-not (Test-Path $Key)) { throw "Key not found: $Key" }
@@ -68,31 +70,30 @@ Write-Host '== pack working tree (excluding .git node_modules data secrets .env 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('btcarb-' + [guid]::NewGuid().ToString('N'))
 $archive = Join-Path $tmp 'btcarb.tar.gz'
 $excludeRx = '^(\.git/|node_modules/|data/|secrets/)|(^|/)\.env$|\.pem$'
-Write-Host "+ git ls-files -co --exclude-standard | filter > files.txt ; tar -czf $archive -T files.txt (fallback: Compress-Archive)" -ForegroundColor Cyan
+Write-Host "+ git ls-files -co --exclude-standard | filter > files.txt ; tar.exe -czf $archive -T files.txt" -ForegroundColor Cyan
 if (-not $DryRun) {
   New-Item -ItemType Directory -Path $tmp | Out-Null
   $files = & git ls-files -co --exclude-standard | Where-Object { $_ -notmatch $excludeRx }
   if ($LASTEXITCODE -ne 0 -or -not $files) { throw 'git ls-files failed or returned nothing' }
-  if (Get-Command tar -ErrorAction SilentlyContinue) {
-    $list = Join-Path $tmp 'files.txt'
-    [IO.File]::WriteAllLines($list, [string[]]$files, (New-Object Text.UTF8Encoding($false)))
-    & tar -czf $archive -T $list
-    if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
-  } else {
-    Write-Warning 'tar not found; using Compress-Archive (zip). unzip is installed by setup-vps.sh.'
-    $archive = Join-Path $tmp 'btcarb.zip'
-    Compress-Archive -Path $files -DestinationPath $archive
-  }
+  # Use the Windows built-in bsdtar (Windows 10 1803+) explicitly: a GNU tar from Git/MSYS earlier on PATH
+  # would treat "C:\..." as a remote host. (Compress-Archive is not a fallback: it flattens directories.)
+  $tarExe = Join-Path $env:SystemRoot 'System32\tar.exe'
+  if (-not (Test-Path $tarExe)) { throw "tar.exe not found at $tarExe (needs Windows 10 1803 or later). Use deploy/deploy.sh from WSL instead." }
+  $list = Join-Path $tmp 'files.txt'
+  [IO.File]::WriteAllLines($list, [string[]]$files, (New-Object Text.UTF8Encoding($false)))
+  & $tarExe -czf $archive -T $list
+  if ($LASTEXITCODE -ne 0) { throw 'tar failed' }
   Write-Host ("archive: {0:N1} KB" -f ((Get-Item $archive).Length / 1KB))
 }
-$isZip = $archive.EndsWith('.zip')
-$remoteName = if ($isZip) { '/tmp/btcarb.zip' } else { '/tmp/btcarb.tar.gz' }
-$extract = if ($isZip) { "unzip -oq $remoteName -d ~/btcarb" } else { "tar -xzf $remoteName -C ~/btcarb" }
+$remoteName = '/tmp/btcarb.tar.gz'
+# Files checked out on Windows may have CRLF endings (core.autocrlf); bash on the VPS needs LF.
+$extract = "tar -xzf $remoteName -C ~/btcarb && sed -i 's/\r`$//' ~/btcarb/deploy/*.sh ~/btcarb/deploy/*.service"
 
 # upload + extract (data/ and .env were excluded so they are preserved)
 Write-Host '== upload and extract (existing data/ and .env are preserved) ==' -ForegroundColor Yellow
-Run 'ssh' ($sshOpts + @($target, 'mkdir -p ~/btcarb ~/btcarb/data ~/btcarb/secrets && chmod 700 ~/btcarb/secrets'))
-Run 'scp' ($sshOpts + @($archive, "${target}:$remoteName"))
+Run 'ssh' ($sshOpts + @($target, 'mkdir -p ~/btcarb ~/btcarb/data ~/btcarb/secrets && chmod 700 ~/btcarb/secrets && { [ -f ~/btcarb/.env ] || install -m 600 /dev/null ~/btcarb/.env; }'))
+try { Run 'scp' ($sshOpts + @($archive, "${target}:$remoteName")) }
+finally { if (-not $DryRun -and (Test-Path $tmp)) { Remove-Item -Recurse -Force $tmp } }
 Run 'ssh' ($sshOpts + @($target, "$extract && rm -f $remoteName && chmod +x ~/btcarb/deploy/*.sh"))
 
 # (c) secrets (contents never printed)
@@ -111,7 +112,6 @@ if ($KalshiPem) {
 Write-Host '== setup on VPS ==' -ForegroundColor Yellow
 Run 'ssh' (@('-t') + $sshOpts + @($target, "SKIP_TESTS=$skip bash ~/btcarb/deploy/setup-vps.sh"))
 
-if (-not $DryRun -and (Test-Path $tmp)) { Remove-Item -Recurse -Force $tmp }
 
 # (e) next steps
 Write-Host ''
