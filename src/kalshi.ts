@@ -30,8 +30,9 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
   const yesBid = top?.yesBid ?? null, noBid = top?.noBid ?? null;
   const m = base;
   // Official CF Benchmarks BRTI (authenticated Kalshi WS) ONLY. No fallback of any kind: otherwise spot is null with a reason.
-  const sp = cfSpot();
-  const spotError = sp ? null : kalshiAuthError() ?? cfError() ?? (kalshiWsUp() ? "no BRTI tick received in the last 3s" : "Kalshi WS not connected");
+  // The resolution price is the 60s average Kalshi itself computes server-side (avg_60s_data), not the raw tick.
+  const avg = cfAvg60(), sp = avg === null ? null : cfSpot();
+  const spotError = avg !== null ? null : kalshiAuthError() ?? cfError() ?? (kalshiWsUp() ? "no BRTI tick received in the last 3s" : "Kalshi WS not connected");
   return {
     venue: "kalshi",
     marketId: m.ticker,
@@ -44,8 +45,8 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
     upBid: yesBid,
     downBid: noBid,
     ts: Date.now(),
-    spot: sp?.price ?? null, spotSource: sp ? "cfbenchmarks" : null, spotTs: sp?.ts ?? null,
-    spotAvg60: sp ? cfAvg60() : null, spotSettle: sp ? cfSettle() : null, spotError,
+    spot: avg, spotSource: avg !== null ? "cfbenchmarks" : null, spotTs: avg !== null ? sp?.ts ?? Date.now() : null,
+    spotAvg60: null, spotSettle: avg !== null ? cfSettle() : null, spotError,
     strikeSource: typeof m.floor_strike === "number" || Number(m.floor_strike) ? "kalshi floor_strike" : null,
     quoteSource: source, quoteAgeMs: top ? Date.now() - top.ts : null,
   };

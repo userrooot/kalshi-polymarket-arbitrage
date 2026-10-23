@@ -80,9 +80,9 @@ Without keys both venues still price on public data, but the Kalshi spot panel h
 ### Spot sources
 
 - **Kalshi** resolves on the CF Benchmarks BRTI index. The only spot shown on the Kalshi panel is that official index, `CF Benchmarks BRTI (official, Kalshi websocket)`, streamed over Kalshi's authenticated websocket (`cfbenchmarks_value`). It needs `KALSHI_API_KEY_ID` and a private key (`KALSHI_PRIVATE_KEY_PATH` or `KALSHI_PRIVATE_KEY`). If the feed is missing, the panel shows `— no official feed` and the reason, for example `no Kalshi API key`. The dashboard does not substitute an average of other exchanges.
-- **Polymarket** resolves on the Chainlink BTC/USD 60s TWAP. With `POLY_API_KEY`, `POLY_API_SECRET` and `POLY_API_PASSPHRASE`, the TWAP is streamed via Polymarket's live-data websocket (`Chainlink 60s TWAP (Polymarket resolution source)`). Without them, the dashboard shows plain Chainlink BTC/USD spot (`Chainlink BTC/USD spot (not TWAP)`).
+- **Polymarket** resolves on the Chainlink BTC/USD 60s TWAP. With `POLY_API_KEY`, `POLY_API_SECRET` and `POLY_API_PASSPHRASE`, the TWAP is streamed via Polymarket's live-data websocket (`Chainlink 60s TWAP (Polymarket resolution source)`). Without them, the Polymarket price shows 'no official feed' (plain Chainlink spot is not the resolution price, so it is not shown).
 - **Price to beat (strike)**: Kalshi uses the market's `floor_strike`. Polymarket uses the Chainlink price at window start. Each panel shows its source under the strike. The spot-minus-strike figure appears only when both the spot and the strike are known.
-- The Kalshi panel shows a 60s average (`60s avg (Kalshi-provided)`). The Polymarket panel shows a 60s average labelled as a settlement estimate.
+- Each panel shows exactly ONE live price: the one its venue resolves on. Kalshi: the 60s average of BRTI that Kalshi computes server-side (`avg_60s_data`, the bot only reads it). Polymarket: the Chainlink 60s TWAP streamed by Polymarket (requires Polymarket API creds). The bot never averages prices itself; without the official feed the panel shows 'no official feed'.
 
 ### Enabling the authenticated websockets
 

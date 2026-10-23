@@ -144,14 +144,14 @@ export async function fetchPolymarket(now = Date.now()): Promise<VenueSnapshot |
   }
   const t = Date.now();
   // Chainlink 60s TWAP (authenticated live-data WS) is primary when fresh; the public RTDS Chainlink feed is the fallback.
-  const tw = twapSpot(), cl = tw ?? chainlinkSpot();
+  const cl = twapSpot(); // resolution price only (TWAP); no plain-spot substitute
   return {
     venue: "polymarket", marketId: l.slug, title: l.title, strike: sk?.value ?? null,
     openTime: l.openTime, closeTime: l.closeTime,
     upAsk: realAsk(u?.ask ?? null), downAsk: realAsk(d?.ask ?? null), upBid: u?.bid ?? null, downBid: d?.bid ?? null, ts: t,
     spot: cl?.price ?? null, spotSource: cl ? cl.source : null,
-    spotTs: cl ? cl.ts : null, spotAvg60: cl ? (tw ? twapAvg60() : null) ?? chainlinkAvg60() : null,
-    spotSettle: null, spotError: cl ? null : "no Chainlink spot yet (RTDS chainlink feed not delivering)",
+    spotTs: cl ? cl.ts : null, spotAvg60: null,
+    spotSettle: null, spotError: cl ? null : "no Chainlink 60s TWAP (needs POLY_API_KEY / POLY_API_SECRET / POLY_API_PASSPHRASE for Polymarket live-data)",
     strikeSource: sk?.source ?? null,
     quoteSource: u?.rest || d?.rest ? "rest" : "ws",
     quoteAgeMs: u && d ? t - Math.min(u.ts, d.ts) : null,
