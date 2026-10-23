@@ -1,4 +1,4 @@
-export interface SpotQuote { price: number; ts: number; source: "chainlink" | "brti-proxy" }
+export interface SpotQuote { price: number; ts: number; source: "chainlink" | "chainlink-twap" | "cfbenchmarks" | "brti-proxy" }
 
 /** Time-ordered ring buffer of (ts ms, value) with window means. */
 export class Series {
@@ -16,6 +16,7 @@ export class Series {
     let n = 0; while (n < a.length && a[n]![0] < cut) n++;
     if (n) a.splice(0, n);
   }
+  clear() { this.pts = []; }
   last(): [number, number] | null { return this.pts.at(-1) ?? null; }
   /** last value at or before ts, only if within maxGapMs */
   at(ts: number, maxGapMs = 30_000): number | null {

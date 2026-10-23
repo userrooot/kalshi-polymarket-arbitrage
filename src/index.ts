@@ -5,6 +5,7 @@ import { startChainlink, chainlinkSpot } from "./feeds/chainlink.ts";
 import { startKalshiBook } from "./feeds/kalshiBook.ts";
 import { feedStats, rate } from "./feeds/meter.ts";
 import { onChange } from "./feeds/notify.ts";
+import { polyLiveStart } from "./feeds/polyLive.ts";
 import { startPolyBook } from "./feeds/polyBook.ts";
 import { fetchKalshi } from "./kalshi.ts";
 import { fetchPolymarket } from "./polymarket.ts";
@@ -67,7 +68,12 @@ function requestTick() {
 }
 onChange(requestTick);
 
-startChainlink(); startBrti(); startPolyBook(); startKalshiBook();
+startChainlink(); startBrti();
+if (config.polyApiKey && config.polyApiSecret && config.polyApiPassphrase) {
+  polyLiveStart({ url: config.polyLiveWsUrl, apiKey: config.polyApiKey, secret: config.polyApiSecret, passphrase: config.polyApiPassphrase });
+  console.log("[sim] Polymarket live-data v2 (Chainlink TWAP) enabled");
+}
+ startPolyBook(); startKalshiBook();
 setInterval(() => { lastTickAt = Date.now(); void tick(); }, config.tickHeartbeatMs); // 1s floor heartbeat
 setInterval(() => { pollBtc().catch(() => {}); }, 5000); // REST spot is only a fallback now
 pollBtc().catch(() => {});

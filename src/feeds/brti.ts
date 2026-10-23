@@ -4,6 +4,7 @@
 import { connectWS } from "./ws.ts";
 import { Series, type SpotQuote } from "./spot.ts";
 import { bump } from "./notify.ts";
+import { meter } from "./meter.ts";
 
 const FRESH_MS = 5000, MIN_VENUES = 3;
 const mids = new Map<string, { mid: number; ts: number }>();
@@ -12,7 +13,9 @@ let lastPub = 0, lastBump = 0;
 
 function setMid(ex: string, bid: number, ask: number) {
   if (!(bid > 0 && ask > 0) || ask < bid) return;
-  mids.set(ex, { mid: (bid + ask) / 2, ts: Date.now() });
+  const mid = (bid + ask) / 2;
+  if (mids.get(ex)?.mid !== mid) meter(`brti:${ex}`).change();
+  mids.set(ex, { mid, ts: Date.now() });
   publish();
 }
 function median(a: number[]) { a.sort((x, y) => x - y); const n = a.length; return n % 2 ? a[n >> 1]! : (a[n / 2 - 1]! + a[n / 2]!) / 2; }

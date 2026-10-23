@@ -1,6 +1,7 @@
 import { config } from "./config.ts";
 import { btcAtWindowStart, btcPrice, btcRestTs } from "./btc.ts";
 import { chainlinkAvg60, chainlinkSpot } from "./feeds/chainlink.ts";
+import { twapAvg60, twapSpot } from "./feeds/polyLive.ts";
 import { polyTop, setPolyTop, watchTokens } from "./feeds/polyBook.ts";
 import { getJson, jsonArr, realAsk } from "./http.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
@@ -62,13 +63,14 @@ export async function fetchPolymarket(now = Date.now()): Promise<VenueSnapshot |
     u = polyTop(l.upToken); d = polyTop(l.downToken);
   }
   const t = Date.now();
-  const cl = chainlinkSpot(), fb = btcPrice();
+  // Chainlink 60s TWAP (authenticated live-data WS) is primary when fresh; the public RTDS Chainlink feed is the fallback.
+  const tw = twapSpot(), cl = tw ?? chainlinkSpot(), fb = btcPrice();
   return {
     venue: "polymarket", marketId: l.slug, title: l.title, strike: l.strike,
     openTime: l.openTime, closeTime: l.closeTime,
     upAsk: realAsk(u?.ask ?? null), downAsk: realAsk(d?.ask ?? null), upBid: u?.bid ?? null, downBid: d?.bid ?? null, ts: t,
-    spot: cl?.price ?? fb, spotSource: cl ? "chainlink" : fb !== null ? "coinbase-rest" : null,
-    spotTs: cl ? cl.ts : fb !== null ? btcRestTs() : null, spotAvg60: chainlinkAvg60(),
+    spot: cl?.price ?? fb, spotSource: cl ? cl.source : fb !== null ? "coinbase-rest" : null,
+    spotTs: cl ? cl.ts : fb !== null ? btcRestTs() : null, spotAvg60: (tw ? twapAvg60() : null) ?? chainlinkAvg60(),
     quoteSource: u?.rest || d?.rest ? "rest" : "ws",
     quoteAgeMs: u && d ? t - Math.min(u.ts, d.ts) : null,
   };

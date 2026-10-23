@@ -23,7 +23,13 @@ export const config = {
   clobUrl: str("POLY_CLOB_URL", "https://clob.polymarket.com"),
   settlePollMs: 10_000,
   settleGiveUpMs: 30 * 60_000,
-  // Unused for now (simulation only, public endpoints):
-  kalshiApiKeyId: process.env.KALSHI_API_KEY_ID,
-  kalshiPrivateKey: process.env.KALSHI_PRIVATE_KEY,
+  // Optional authenticated websockets (read-only data; no orders are ever sent). Never logged.
+  kalshiApiKeyId: process.env.KALSHI_API_KEY_ID || undefined,
+  kalshiPrivateKeyPath: process.env.KALSHI_PRIVATE_KEY_PATH || undefined,
+  kalshiPrivateKey: process.env.KALSHI_PRIVATE_KEY || undefined, // inline PEM; literal \n accepted
+  kalshiWsUrl: str("KALSHI_WS_URL", "wss://external-api-ws.kalshi.com/trade-api/ws/v2"),
+  polyApiKey: process.env.POLY_API_KEY || undefined,
+  polyApiSecret: process.env.POLY_API_SECRET || undefined,
+  polyApiPassphrase: process.env.POLY_API_PASSPHRASE || undefined,
+  polyLiveWsUrl: str("POLY_LIVE_WS_URL", "wss://ws-live-v2.polymarket.com/ws"),
 };

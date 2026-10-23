@@ -1,5 +1,6 @@
 import { connectWS, type WSHandle } from "./ws.ts";
 import { bump } from "./notify.ts";
+import { meter } from "./meter.ts";
 
 export interface Top { ask: number | null; bid: number | null; ts: number; rest?: boolean }
 const tops = new Map<string, Top>();
@@ -12,7 +13,7 @@ const cents = (x: unknown) => { const n = Number(x) * 100; return Number.isFinit
 function setTop(token: string, ask: number | null, bid: number | null) {
   const prev = tops.get(token);
   tops.set(token, { ask, bid, ts: Date.now() });
-  if (!prev || prev.ask !== ask || prev.bid !== bid) bump("poly");
+  if (!prev || prev.ask !== ask || prev.bid !== bid) { meter("polyBook").change(); bump("poly"); }
 }
 function fromBook(token: string) {
   const b = books.get(token);
@@ -23,6 +24,8 @@ function fromBook(token: string) {
 }
 function handleEvent(e: any) {
   const t = e?.event_type;
+  const ets = Number(e?.timestamp); // venue ms timestamp (clock-skew caveat)
+  if (ets > 1e12) meter("polyBook").latency(Date.now() - ets);
   if (t === "book" && watched.includes(e.asset_id)) {
     const side = (rows: any[]) => new Map<string, number>((rows ?? []).map((r) => [String(r.price), Number(r.size)]));
     books.set(e.asset_id, { asks: side(e.asks), bids: side(e.bids) });

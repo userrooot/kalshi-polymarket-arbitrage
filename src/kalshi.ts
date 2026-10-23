@@ -2,6 +2,7 @@ import { config } from "./config.ts";
 import { getJson, realAsk } from "./http.ts";
 import { btcPrice, btcRestTs } from "./btc.ts";
 import { brtiAvg60, brtiSpot } from "./feeds/brti.ts";
+import { cfAvg60, cfSpot } from "./feeds/kalshiIndex.ts";
 import { fetchKalshiTop, kalshiTop, kalshiWatch } from "./feeds/kalshiBook.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
 
@@ -21,14 +22,16 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
   // Quotes come from the polled orderbook cache (Kalshi books hold BIDS only: YES ask = 100 - best NO bid,
   // NO ask = 100 - best YES bid). The listing endpoint lags by seconds so it is never used. REST fallback only if the cache is stale.
   kalshiWatch(base.ticker);
-  let top = kalshiTop(base.ticker), source: "ws" | "rest" = "ws";
+  let top = kalshiTop(base.ticker);
   if (!top || Date.now() - top.ts > config.maxQuoteAgeMs) {
     const r = await fetchKalshiTop(base.ticker);
-    if (r) { top = r; source = "rest"; }
+    if (r) top = r;
   }
+  const source: "ws" | "rest" = top?.src ?? "rest"; // honest: cached REST polls report "rest"
   const yesBid = top?.yesBid ?? null, noBid = top?.noBid ?? null;
   const m = base;
-  const sp = brtiSpot(), fb = btcPrice();
+  // Real CF Benchmarks index (authenticated WS) when fresh, else the exchange-median proxy.
+  const cf = cfSpot(), sp = cf ?? brtiSpot(), fb = btcPrice();
   return {
     venue: "kalshi",
     marketId: m.ticker,
@@ -41,8 +44,8 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
     upBid: yesBid,
     downBid: noBid,
     ts: Date.now(),
-    spot: sp?.price ?? fb, spotSource: sp ? "brti-proxy" : fb !== null ? "coinbase-rest" : null,
-    spotTs: sp ? sp.ts : fb !== null ? btcRestTs() : null, spotAvg60: brtiAvg60(),
+    spot: sp?.price ?? fb, spotSource: sp ? sp.source : fb !== null ? "coinbase-rest" : null,
+    spotTs: sp ? sp.ts : fb !== null ? btcRestTs() : null, spotAvg60: (cf ? cfAvg60() : null) ?? brtiAvg60(),
     quoteSource: source, quoteAgeMs: top ? Date.now() - top.ts : null,
   };
 }

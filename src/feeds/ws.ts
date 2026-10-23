@@ -9,6 +9,11 @@ export interface WSOpts {
   pingMsg?: string;          // text sent every pingMs (default none)
   staleMs?: number;          // reconnect if no message for this long
   meterName?: string;
+  /** Called on EVERY connect attempt (handshake headers, e.g. a fresh signed timestamp). Throwing counts as a failed attempt. */
+  headers?: () => Record<string, string>;
+  /** Called on every close. Return "stop" to give up for good, or a number (ms) to override the next reconnect delay. */
+  onClose?: (code: number, reason: string) => "stop" | number | void;
+  maxBackoffMs?: number;     // default 10s
 }
 export interface WSHandle { send(s: string | object): void; close(): void; reconnect(): void }
 
@@ -18,6 +23,7 @@ export function connectWS(o: WSOpts): WSHandle {
   let ws: WebSocket | null = null, closed = false, attempt = 0, lastMsg = Date.now();
   let timers: ReturnType<typeof setInterval>[] = [];
   let retry: ReturnType<typeof setTimeout> | null = null;
+  let forcedDelay: number | null = null;
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 
   const handle: WSHandle = {
@@ -32,13 +38,21 @@ export function connectWS(o: WSOpts): WSHandle {
     m.connected = false;
     if (closed) return;
     m.reconnects++;
-    const delay = Math.min(10_000, 500 * 2 ** attempt++);
+    const delay = forcedDelay ?? Math.min(o.maxBackoffMs ?? 10_000, 500 * 2 ** attempt++);
+    forcedDelay = null;
     retry = setTimeout(open, delay);
   };
   function open() {
     if (closed) return;
     let mine: WebSocket;
-    try { mine = proxy ? new WebSocket(o.url, { proxy } as any) : new WebSocket(o.url); } catch { drop(); return; }
+    try {
+      const headers = o.headers?.();
+      const local = /^wss?:\/\/(localhost|127\.|\[::1\])/.test(o.url);
+      const opts: any = {};
+      if (proxy && !local) opts.proxy = proxy;
+      if (headers) opts.headers = headers;
+      mine = Object.keys(opts).length ? new WebSocket(o.url, opts) : new WebSocket(o.url);
+    } catch { drop(); return; }
     ws = mine; lastMsg = Date.now();
     let dead = false;
     const die = () => { if (dead || ws !== mine) return; dead = true; try { mine.close(); } catch {} drop(); };
@@ -54,7 +68,16 @@ export function connectWS(o: WSOpts): WSHandle {
       try { o.onMessage(typeof e.data === "string" ? e.data : String(e.data), handle); } catch (err) { console.error(`[${o.name}] onMessage`, err); }
     };
     mine.onerror = () => die();
-    mine.onclose = () => die();
+    mine.onclose = (e: any) => {
+      if (ws === mine && !dead && o.onClose) {
+        try {
+          const r = o.onClose(Number(e?.code) || 0, String(e?.reason ?? ""));
+          if (r === "stop") { closed = true; cleanup(); m.connected = false; return; }
+          if (typeof r === "number") forcedDelay = r;
+        } catch (err) { console.error(`[${o.name}] onClose`, err); }
+      }
+      die();
+    };
   }
   open();
   return handle;
