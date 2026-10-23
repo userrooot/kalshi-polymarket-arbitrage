@@ -1389,9 +1389,9 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     return `${new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}.${frac}`;
   };
   const xRel = (t, t0) => (isNum(t) && isNum(t0) ? `+${xNum(t - t0)}` : DASH);
-  // decision time: the backend may add decisionAt; otherwise the first send is the decision
+  // decision time: the backend sends decidedAt (ms); otherwise the first send is the decision
   const xDecision = (a) => {
-    if (isNum(a.decisionAt)) return a.decisionAt;
+    if (isNum(a.decidedAt)) return a.decidedAt;
     const sent = [a.kalshi?.sentAt, a.poly?.sentAt].filter(isNum);
     return sent.length ? Math.min(...sent) : null;
   };

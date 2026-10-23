@@ -63,6 +63,12 @@ export function kalshiWsStart(opts: KalshiWsOpts): WSHandle {
     onMessage: (raw) => { if (raw[0] === "{") onMsg(JSON.parse(raw)); },
   });
   setInterval(snapshotWatchdog, 1000).unref?.();
+  // Exec-layer liveness heartbeat: a delta-driven book is silent while nothing changes, which the episode tracker would read as a
+  // feed gap (stale). Re-publish the unchanged live book each second (BookHistory dedups it; only the "last seen" time moves).
+  setInterval(() => {
+    const b = watched ? books.get(watched) : undefined;
+    if (handle && up && watched && b?.snapshotted) { const l = b.levels(); publishKalshi(watched, l.yesBids, l.noBids, null, "ws"); }
+  }, 1000).unref?.();
   return handle;
 }
 

@@ -216,6 +216,10 @@ export async function runKalshiDemo(d: ProbeDeps, m: Measurements, n = 5): Promi
   const keyId = config2.kalshiDemoKeyId;
   const keyPath = config2.kalshiDemoKeyPath;
   if (!keyId || !keyPath) { rep.detail = "KALSHI_DEMO_API_KEY_ID / KALSHI_DEMO_PRIVATE_KEY_PATH not set"; return rep; }
+  // Demo orders BUY AT THE ASK (they fill). Never let KALSHI_DEMO_BASE_URL point this at production: that would bypass the live gates.
+  let host = "";
+  try { host = new URL(base).hostname; } catch {}
+  if (!/(^|\.)demo\.kalshi\.co$/.test(host) && !/(^|\.)demo-api\.kalshi\.co$/.test(host)) { rep.status = "error"; rep.detail = `refusing: KALSHI_DEMO_BASE_URL host '${host}' is not a Kalshi demo host`; return rep; }
   let creds: KalshiCreds;
   try { creds = { keyId, key: loadPrivateKey({ path: keyPath })! }; } catch { rep.status = "error"; rep.detail = "could not load demo private key"; return rep; }
   const list = await kalshiSigned(d, base, creds, "GET", "/markets?status=open&limit=200");
@@ -399,7 +403,10 @@ async function main() {
   if (argv.includes("--live") || process.env.CALIBRATE_LIVE === "1") {
     const rl = createInterface({ input: process.stdin, output: process.stdout });
     try {
-      const rep = await runLiveCalibration({ deps: defaultDeps(), argv, ask: (q) => rl.question(q), maxOrders: Number(arg("--live-n")) || 3 });
+      // stdin closed / not interactive -> answer "" (refuse) instead of hanging forever on the question
+      const closed = new Promise<string>((res) => rl.once("close", () => res("")));
+      const ask = (q: string) => (process.stdin.isTTY ? Promise.race([rl.question(q), closed]) : Promise.resolve(""));
+      const rep = await runLiveCalibration({ deps: defaultDeps(), argv, ask, maxOrders: Number(arg("--live-n")) || 3 });
       if (rep.refused.length) console.log(`[probe] live calibration REFUSED, missing: ${rep.refused.join("; ")}`);
       else console.log(`[probe] live calibration: ${JSON.stringify(rep)}`);
     } finally { rl.close(); }

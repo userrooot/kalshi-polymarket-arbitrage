@@ -72,7 +72,8 @@ export class DepthAdapter {
     const tk: string | undefined = j.msg?.market_ticker;
     if (!tk) return [];
     const sid = Number(j.sid), sq = Number(j.seq);
-    const venueTs = Number(j.sending_ts_ms) > 1e12 ? Number(j.sending_ts_ms) : l.venueTs ?? null;
+    const vt = Number(j.msg?.ts_ms) || Number(j.sending_ts_ms); // same precedence as live kalshiWs.ts tsOf()
+    const venueTs = vt > 1e12 ? vt : l.venueTs ?? null;
     let b = this.kb.get(tk);
     if (t === "orderbook_snapshot") {
       this.seq.rebase(sid, sq);

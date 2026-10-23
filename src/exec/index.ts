@@ -51,7 +51,13 @@ function horizonMs(): number {
 function enqueue(decision: Decision, trade: Trade | null): Group {
   const g: Group = { id: nextGroup++, decision, samples: sampleAttempt(profile, rng), dueAt: decision.decidedAt + horizonMs(), trade, results: null };
   groups.push(g);
-  if (groups.length > MAX_GROUPS) { const old = groups.shift()!; if (old.trade) tradeGroup.delete(old.trade.id); }
+  if (groups.length > MAX_GROUPS) {
+    // Drop the oldest group that carries no trade (a burst of episode starts must not evict a trade's pending decision).
+    let i = groups.findIndex((x) => !x.trade);
+    if (i < 0) i = 0;
+    const [old] = groups.splice(i, 1);
+    if (old!.trade) tradeGroup.delete(old!.trade.id);
+  }
   return g;
 }
 
@@ -67,7 +73,11 @@ export function execOnTrade(t: Trade, combo: Combo, k: VenueSnapshot, p: VenueSn
   const kl = history.latest("kalshi", k.marketId), pl = history.latest("polymarket", p.marketId);
   const seen = kl && pl ? Math.max(kl.recvTs, pl.recvTs) : now;
   const decidedAt = Math.min(now, Math.max(now - 5000, seen));
-  const g0 = groups.find((g) => !g.trade && g.decision.combo === combo.id && g.decision.kalshi.key === k.marketId && Math.abs(g.decision.decidedAt - decidedAt) <= 2000);
+  // Reuse an episode decision only if it IS this decision (same book update, same seen asks). A looser time match would back-date
+  // the trade to the episode start, i.e. simulate a faster bot than the one that actually traded.
+  const same = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  const g0 = groups.find((g) => !g.trade && g.decision.combo === combo.id && g.decision.kalshi.key === k.marketId && g.decision.poly.key === p.marketId
+    && Math.abs(g.decision.decidedAt - decidedAt) <= 1 && same(g.decision.kalshi.seenAsk, combo.kalshiAsk!) && same(g.decision.poly.seenAsk, combo.polyAsk!));
   const g = g0 ?? enqueue({ combo: combo.id, qty: t.contracts, decidedAt, kalshi: { key: k.marketId, side: combo.kalshiSide, seenAsk: combo.kalshiAsk }, poly: { key: p.marketId, side: combo.polySide, seenAsk: combo.polyAsk }, source: "trade", tradeId: t.id }, null);
   g.trade = t; g.decision.tradeId = t.id; tradeGroup.set(t.id, g);
   if (g.results) applyToTrade(g);
@@ -86,7 +96,7 @@ const c2 = (n: number | null) => (n === null ? "n/a" : (Math.round(n * 100) / 10
 /** Attach the exec summary to the trade; when EXEC_PRIMARY != NAIVE, the primary strategy's fills become the trade's headline economics. */
 function applyToTrade(g: Group) {
   const t = g.trade;
-  if (!t || t.exec || t.status !== "OPEN") return;
+  if (!t || t.exec || t.status !== "OPEN" || !g.results?.length) return; // results = [] when evaluation threw
   t.exec = summary(g);
   const prim = config.execPrimary;
   if (prim !== "NAIVE") {
@@ -110,6 +120,14 @@ function applyToTrade(g: Group) {
 }
 
 function evaluate(g: Group) {
+  // No depth recorded for either venue at decision time (startup, rollover, feed down): the sim cannot say anything. Do not
+  // count it as a NONE/no_book attempt and do not let it turn a trade into "not filled" — leave the trade on NAIVE economics.
+  const d = g.decision;
+  if (!history.at("kalshi", d.kalshi.key, d.decidedAt, "recv") || !history.at("polymarket", d.poly.key, d.decidedAt, "recv")) {
+    g.results = [];
+    if (g.trade && !g.trade.entryReason.includes("EXEC n/a")) { g.trade.entryReason += " | EXEC n/a: no recorded depth at decision time (simulation skipped)"; try { updateTrade(g.trade); } catch {} }
+    return;
+  }
   g.results = runAll(g.decision, history, profile, { samples: g.samples });
   for (const r of g.results) {
     attempts.push(r); recent.unshift(r);
@@ -131,7 +149,10 @@ export function execOnSettle(t: Trade, kalshiWon: boolean, polyWon: boolean) {
 }
 
 function sweepCurve() {
-  const sample = groups.filter((g) => g.results).slice(-60);
+  // Only decisions whose books are still fully inside the (count-capped) depth history; otherwise at() finds no book and the
+  // curve would show spurious no_book misses.
+  const covered = (v: "kalshi" | "polymarket", key: string, t: number) => { const s = history.span(v, key); return !!s && s.from <= t - 100; };
+  const sample = groups.filter((g) => g.results?.length && covered("kalshi", g.decision.kalshi.key, g.decision.decidedAt) && covered("polymarket", g.decision.poly.key, g.decision.decidedAt)).slice(-60);
   if (!sample.length) return;
   const polyRtt = medianOf(profile.polymarket.sendOneWay) + medianOf(profile.polymarket.ackOneWay);
   const feedK = medianOf(profile.kalshi.feedDelay), feedP = medianOf(profile.polymarket.feedDelay);

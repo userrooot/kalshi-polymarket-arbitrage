@@ -11,6 +11,8 @@ function db(): Database {
   if (config.dbPath !== ":memory:") mkdirSync(dirname(config.dbPath), { recursive: true });
   const d = new Database(config.dbPath, { create: true });
   d.run("PRAGMA journal_mode=WAL");
+  // WAL + NORMAL: no fsync per INSERT (episode rows are written synchronously from the WS message path); still crash-safe for the app.
+  d.run("PRAGMA synchronous=NORMAL");
   d.run("CREATE TABLE IF NOT EXISTS trades (id INTEGER PRIMARY KEY AUTOINCREMENT, event_key TEXT NOT NULL, status TEXT NOT NULL, data TEXT NOT NULL)");
   d.run("CREATE TABLE IF NOT EXISTS events (event_key TEXT PRIMARY KEY, kalshi_ticker TEXT NOT NULL)");
   // Price-to-beat per 15m window (windowStart = unix seconds), so a restart mid-window keeps the strike.

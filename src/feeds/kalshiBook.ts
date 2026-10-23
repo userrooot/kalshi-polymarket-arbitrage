@@ -46,7 +46,10 @@ export const kalshiWsEnabled = () => wsOn;
 
 function store(tk: string, r: KTop, meterName: "ws" | "rest") {
   const prev = tops.get(tk);
-  if (r.src === "rest") // COARSE depth: only the best level of each side (REST ?depth=1); WS depth is published from kalshiWs.ts
+  // COARSE depth: only the best level of each side (REST ?depth=1); WS depth is published from kalshiWs.ts. While the WS book is
+  // live a quiet market (no delta for MAX_QUOTE_AGE_MS) still triggers REST polls: do NOT interleave those top-1 books with the
+  // full WS ladder in the exec history (deeper levels would flap away -> fake depth_consumed kills, fake race losses).
+  if (r.src === "rest" && !(wsOn && kalshiWsReady(tk)))
     publishKalshi(tk, r.yesBid !== null ? [{ price: r.yesBid, size: r.yesSz ?? 1 }] : [], r.noBid !== null ? [{ price: r.noBid, size: r.noSz ?? 1 }] : [], null, "rest-coarse");
   tops.set(tk, r);
   if (!prev || prev.yesBid !== r.yesBid || prev.noBid !== r.noBid) {

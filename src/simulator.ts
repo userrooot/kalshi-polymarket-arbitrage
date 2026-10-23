@@ -60,7 +60,7 @@ export function onTick(k: VenueSnapshot | null, p: VenueSnapshot | null, btc: nu
       status: "OPEN",
     });
     trades.push(t); taken.push(t);
-    execOnTrade(t, combo, k, p, now); // realistic-execution sim (async; may later adjust this trade per EXEC_PRIMARY)
+    try { execOnTrade(t, combo, k, p, now); } catch (e) { console.error("[exec] execOnTrade", e); } // realistic-execution sim (async; may later adjust this trade per EXEC_PRIMARY)
     lastTradeAt.set(eventKey, now);
   }
   return { combos, taken };
