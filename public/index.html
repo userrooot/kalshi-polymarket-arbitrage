@@ -1,0 +1,878 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BTC 15m Arbitrage Simulator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0b0f17;
+  --panel: #121a2a;
+  --panel-2: #18223a;
+  --border: #25314d;
+  --text: #e6ebf5;
+  --muted: #8a96b0;
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --blue: #38bdf8;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 600; }
+h1 { font-size: 17px; }
+h2 { font-size: 15px; }
+h4 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 8px; }
+label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 2px; }
+b { font-weight: 600; }
+p { margin: 0; }
+.mono { font-family: var(--mono); }
+.muted { color: var(--muted); }
+.pos { color: var(--green); }
+.neg { color: var(--red); }
+.warn-text { color: var(--amber); }
+.warn { color: var(--amber); }
+[hidden] { display: none !important; }
+
+/* ---------- header ---------- */
+.top {
+  position: sticky; top: 0; z-index: 5;
+  display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; justify-content: space-between;
+  padding: 12px 16px;
+  background: rgba(11, 15, 23, .92);
+  backdrop-filter: blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+.brand { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); display: inline-block; flex: none; }
+.dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.dot.connecting { background: var(--amber); animation: blink 1s infinite; }
+.dot.stale { background: var(--amber); }
+.dot.offline { background: var(--red); }
+@keyframes blink { 50% { opacity: .3; } }
+.sim-badge {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  color: #111; background: var(--amber); padding: 3px 8px; border-radius: 4px;
+}
+.hstats { display: flex; flex-wrap: wrap; gap: 14px 28px; }
+.hstats > div { min-width: 0; }
+.hstats b { font-size: 15px; font-family: var(--mono); white-space: nowrap; }
+#closes.warn-text { color: var(--amber); }
+
+/* ---------- layout ---------- */
+main { padding: 16px; display: grid; gap: 16px; max-width: 1400px; margin: 0 auto; }
+.grid-2 { display: grid; gap: 16px; grid-template-columns: 1fr; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+  min-width: 0;
+}
+.panel-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chart-box { position: relative; height: 240px; }
+.chart-empty {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  color: var(--muted); font-size: 13px; pointer-events: none;
+}
+
+/* ---------- stats ---------- */
+.stats { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.card b { font-size: 20px; font-family: var(--mono); white-space: nowrap; }
+.card.big b { font-size: 26px; }
+
+/* ---------- venues ---------- */
+.venue.offline { opacity: .55; }
+.venue-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.venue-head h2 { font-size: 17px; }
+.venue-title { color: var(--muted); margin: 6px 0 12px; overflow-wrap: anywhere; }
+.kv { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+.kv b { font-family: var(--mono); font-size: 16px; }
+.quote { width: 100%; border-collapse: collapse; }
+.quote th, .quote td { padding: 8px 6px; border-top: 1px solid var(--border); text-align: right; font-family: var(--mono); }
+.quote thead th { font-family: inherit; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); border-top: none; }
+.quote tbody th { text-align: left; font-family: inherit; font-weight: 600; }
+.quote td { font-size: 16px; }
+
+/* ---------- arbitrage ---------- */
+.combos { display: grid; gap: 12px; grid-template-columns: 1fr; }
+.combo {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 14px;
+}
+.combo.tradable { border-color: var(--green); box-shadow: inset 0 0 0 1px rgba(34, 197, 94, .35); }
+.combo-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.legs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.leg { background: var(--bg); border-radius: 8px; padding: 8px 10px; }
+.leg span { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.leg .side { font-family: var(--mono); font-size: 15px; font-weight: 700; }
+.leg .price { font-family: var(--mono); color: var(--muted); }
+.combo-foot { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+.combo-foot b { font-family: var(--mono); font-size: 16px; }
+.badge {
+  font-size: 11px; font-weight: 700; letter-spacing: .05em; padding: 3px 8px; border-radius: 4px;
+  text-transform: uppercase; white-space: nowrap;
+}
+.badge.ok { background: var(--green); color: #04130a; }
+.badge.off { background: #2a3550; color: var(--muted); }
+
+/* ---------- trades ---------- */
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  padding: 6px 8px; font: inherit; max-width: 100%;
+}
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+table.trades { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 980px; }
+table.trades th, table.trades td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap; }
+table.trades thead th { background: var(--panel-2); color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; position: sticky; top: 0; }
+table.trades td.num, table.trades th.num { text-align: right; font-family: var(--mono); }
+tr.trade-row { cursor: pointer; }
+tr.trade-row:hover td, tr.trade-row:focus td { background: rgba(56, 189, 248, .06); }
+tr.trade-row:focus { outline: none; }
+tr.trade-row.open td { background: rgba(56, 189, 248, .10); }
+tr.group td {
+  background: var(--bg); font-weight: 600; color: var(--text);
+  padding: 6px 10px; border-bottom: 1px solid var(--border);
+}
+tr.detail-row td { white-space: normal; background: var(--bg); padding: 0; }
+.detail {
+  display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  padding: 14px 16px; border-left: 3px solid var(--blue);
+}
+.detail p { white-space: normal; overflow-wrap: anywhere; }
+.kv-row { display: flex; justify-content: space-between; gap: 12px; padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.kv-row span { color: var(--muted); }
+.kv-row b { font-family: var(--mono); text-align: right; }
+.detail .outcome { margin-top: 10px; padding: 10px; border-radius: 8px; background: var(--panel-2); }
+.tag { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: .04em; }
+.tag.open { background: rgba(245, 158, 11, .18); color: var(--amber); }
+.tag.won { background: rgba(34, 197, 94, .18); color: var(--green); }
+.tag.lost { background: rgba(239, 68, 68, .18); color: var(--red); }
+.tag.settled, .tag.flat { background: #2a3550; color: var(--muted); }
+button.why {
+  background: transparent; color: var(--blue); border: 1px solid var(--border); border-radius: 6px;
+  padding: 3px 8px; font: inherit; font-size: 12px; cursor: pointer;
+}
+button.why:hover { border-color: var(--blue); }
+td.empty { text-align: center; color: var(--muted); padding: 20px; }
+
+/* ---------- responsive ---------- */
+@media (min-width: 860px) {
+  .grid-2 { grid-template-columns: 1fr 1fr; }
+  .combos { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  main { padding: 12px; }
+  .top { padding: 10px 12px; }
+  .hstats { gap: 10px 18px; }
+  .kv { grid-template-columns: 1fr 1fr; }
+  .quote td { font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span id="conn" class="dot connecting" title="Connecting..."></span>
+    <h1>BTC 15m Arbitrage</h1>
+    <span class="sim-badge">SIMULATION - no real money</span>
+  </div>
+  <div class="hstats">
+    <div><label>BTC price</label><b id="btc">—</b></div>
+    <div><label>Event window</label><b id="window">—</b></div>
+    <div><label>Closes in</label><b id="closes">—</b></div>
+    <div><label>Trades this event</label><b id="event-trades">—</b></div>
+  </div>
+</header>
+
+<main>
+
+  <section class="stats" aria-label="Statistics">
+    <div class="card big"><label>Total PnL</label><b id="s-pnl">—</b></div>
+    <div class="card"><label>Win rate</label><b id="s-win">—</b></div>
+    <div class="card"><label>Wins / losses</label><b id="s-wl">—</b></div>
+    <div class="card"><label>Open / settled</label><b id="s-oc">—</b></div>
+    <div class="card"><label>Total staked</label><b id="s-stake">—</b></div>
+  </section>
+
+  <section class="grid-2">
+    <article class="panel venue" id="panel-k">
+      <div class="venue-head">
+        <h2>Kalshi</h2>
+        <span class="muted mono" id="k-market">—</span>
+      </div>
+      <div class="venue-title" id="k-title">Waiting for market data...</div>
+      <div class="kv">
+        <div><label>Strike (price to beat)</label><b id="k-strike">—</b></div>
+        <div><label>Time left</label><b id="k-left">—</b></div>
+      </div>
+      <table class="quote">
+        <thead><tr><th></th><th>Ask (buy)</th><th>Bid (sell)</th></tr></thead>
+        <tbody>
+          <tr><th>Up</th><td id="k-upAsk">—</td><td id="k-upBid">—</td></tr>
+          <tr><th>Down</th><td id="k-downAsk">—</td><td id="k-downBid">—</td></tr>
+        </tbody>
+      </table>
+    </article>
+
+    <article class="panel venue" id="panel-p">
+      <div class="venue-head">
+        <h2>Polymarket</h2>
+        <span class="muted mono" id="p-market">—</span>
+      </div>
+      <div class="venue-title" id="p-title">Waiting for market data...</div>
+      <div class="kv">
+        <div><label>Strike (price to beat)</label><b id="p-strike">—</b></div>
+        <div><label>Time left</label><b id="p-left">—</b></div>
+      </div>
+      <table class="quote">
+        <thead><tr><th></th><th>Ask (buy)</th><th>Bid (sell)</th></tr></thead>
+        <tbody>
+          <tr><th>Up</th><td id="p-upAsk">—</td><td id="p-upBid">—</td></tr>
+          <tr><th>Down</th><td id="p-downAsk">—</td><td id="p-downBid">—</td></tr>
+        </tbody>
+      </table>
+    </article>
+  </section>
+
+  <section class="panel" aria-label="Arbitrage combos">
+    <div class="panel-head">
+      <h2>Arbitrage combos</h2>
+      <span class="muted">Max total cost <b id="max-cost" class="mono">—</b> per contract</span>
+    </div>
+    <div class="combos">
+      <div class="combo" id="c0-card">
+        <div class="combo-head">
+          <b>Kalshi UP + Polymarket DOWN</b>
+          <span class="badge off" id="c0-badge">—</span>
+        </div>
+        <div class="legs">
+          <div class="leg"><span>Kalshi</span><div class="side" id="c0-kside">—</div><div class="price" id="c0-kask">—</div></div>
+          <div class="leg"><span>Polymarket</span><div class="side" id="c0-pside">—</div><div class="price" id="c0-pask">—</div></div>
+        </div>
+        <div class="combo-foot">
+          <div><label>Total cost</label><b id="c0-cost">—</b></div>
+          <div><label>Locked profit</label><b id="c0-profit">—</b></div>
+        </div>
+      </div>
+      <div class="combo" id="c1-card">
+        <div class="combo-head">
+          <b>Kalshi DOWN + Polymarket UP</b>
+          <span class="badge off" id="c1-badge">—</span>
+        </div>
+        <div class="legs">
+          <div class="leg"><span>Kalshi</span><div class="side" id="c1-kside">—</div><div class="price" id="c1-kask">—</div></div>
+          <div class="leg"><span>Polymarket</span><div class="side" id="c1-pside">—</div><div class="price" id="c1-pask">—</div></div>
+        </div>
+        <div class="combo-foot">
+          <div><label>Total cost</label><b id="c1-cost">—</b></div>
+          <div><label>Locked profit</label><b id="c1-profit">—</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid-2">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Combo total cost (live)</h2>
+        <span class="muted">dashed line = max total cost</span>
+      </div>
+      <div class="chart-box">
+        <canvas id="costChart" aria-label="Live total cost of both combos"></canvas>
+        <div class="chart-empty" id="cost-empty">Waiting for prices...</div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Cumulative PnL</h2>
+        <span class="muted">green = up, red = down</span>
+      </div>
+      <div class="chart-box">
+        <canvas id="pnlChart" aria-label="Cumulative PnL"></canvas>
+        <div class="chart-empty" id="pnl-empty">No settled trades yet</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" aria-label="Trades">
+    <div class="toolbar">
+      <div class="filters">
+        <label for="f-event" style="margin:0">Event</label>
+        <select id="f-event"><option value="all">All events</option></select>
+        <label for="f-status" style="margin:0">Status</label>
+        <select id="f-status">
+          <option value="all">All</option>
+          <option value="open">Open</option>
+          <option value="settled">Settled</option>
+          <option value="won">Won</option>
+          <option value="lost">Lost</option>
+        </select>
+      </div>
+      <span class="muted" id="trade-count">0 trades</span>
+    </div>
+    <div class="table-wrap">
+      <table class="trades">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Event</th>
+            <th>Time</th>
+            <th>Combo</th>
+            <th>Kalshi</th>
+            <th>Polymarket</th>
+            <th class="num">Total cost</th>
+            <th class="num">Contracts</th>
+            <th class="num">Stake</th>
+            <th>Status</th>
+            <th class="num">PnL</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="trade-body"></tbody>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:10px;font-size:12px">Click a row (or "Why?") to see the entry reason, real results on both venues and the outcome explanation.</p>
+  </section>
+
+</main>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- constants & formatting helpers ----------
+  const DASH = "—";
+  const $ = (id) => document.getElementById(id);
+  const isNum = (v) => typeof v === "number" && isFinite(v);
+  const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const pad = (n) => String(n).padStart(2, "0");
+  const toMs = (v) => {
+    if (v == null || v === "") return null;
+    const t = typeof v === "number" ? v : Date.parse(v);
+    return isNaN(t) ? null : t;
+  };
+  const fmtCents = (v) => (isNum(v) ? `${Math.round(v * 10) / 10}¢` : DASH);
+  const fmtUsd = (v, d = 2) => (isNum(v)
+    ? "$" + v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d })
+    : DASH);
+  const fmtMoney = (v) => {
+    if (!isNum(v)) return DASH;
+    const r = Math.round(v * 100) / 100;
+    if (r === 0) return "$0.00";
+    const abs = Math.abs(r).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (r > 0 ? "+$" : "-$") + abs;
+  };
+  const fmtPct = (v, d = 2) => (isNum(v) ? `${v.toFixed(d)}%` : DASH);
+  const signCls = (v) => (!isNum(v) || v === 0 ? "" : v > 0 ? "pos" : "neg");
+  const fmtTime = (ms) => (isNum(ms)
+    ? new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" })
+    : DASH);
+  const fmtHM = (ms) => (isNum(ms)
+    ? new Date(ms).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
+    : DASH);
+  const fmtClock = (ms) => (isNum(ms)
+    ? new Date(ms).toLocaleString("en-GB", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })
+    : DASH);
+  const fmtCountdown = (ms) => {
+    if (!isNum(ms)) return DASH;
+    if (ms <= 0) return "closed";
+    const s = Math.floor(ms / 1000);
+    return `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+  };
+  const setText = (id, text) => {
+    const el = $(id);
+    if (el && el.textContent !== text) el.textContent = text;
+  };
+  const COMBO_SLOT = { "K_UP+P_DOWN": "c0", "K_DOWN+P_UP": "c1" };
+  const COMBO_SHORT = { "K_UP+P_DOWN": "K UP + P DOWN", "K_DOWN+P_UP": "K DOWN + P UP" };
+
+  // ---------- state ----------
+  let S = null;                 // latest DashboardState
+  let conn = "connecting";      // live | connecting | stale | offline
+  let lastMsgAt = 0;
+  let ws = null;
+  let retry = 0;
+  let reconnectTimer = null;
+  let costChart = null;
+  let pnlChart = null;
+  const expanded = new Set();   // expanded trade ids
+  let lastTradesSig = "";
+  let eventSig = "";
+
+  // ---------- connection ----------
+  function setConn(state) {
+    conn = state;
+    const dot = $("conn");
+    dot.className = "dot " + state;
+    dot.title = {
+      live: "Live",
+      stale: "No update for 5 s",
+      connecting: "Connecting...",
+      offline: "Disconnected, retrying",
+    }[state];
+  }
+
+  function scheduleReconnect() {
+    clearTimeout(reconnectTimer);
+    const delay = Math.min(5000, 500 * 2 ** retry);
+    retry = Math.min(retry + 1, 10);
+    reconnectTimer = setTimeout(connect, delay);
+  }
+
+  function connect() {
+    clearTimeout(reconnectTimer);
+    const proto = location.protocol === "https:" ? "wss:" : "ws:";
+    let sock;
+    try {
+      sock = new WebSocket(`${proto}//${location.host}/ws`);
+    } catch (_e) {
+      setConn("offline");
+      scheduleReconnect();
+      return;
+    }
+    ws = sock;
+    setConn("connecting");
+    sock.onopen = () => { retry = 0; setConn("live"); };
+    sock.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch (_e) { return; }
+      if (!msg || (msg.type && msg.type !== "state")) return;
+      lastMsgAt = Date.now();
+      setConn("live");
+      render(msg);
+    };
+    sock.onclose = () => {
+      if (ws !== sock) return;
+      ws = null;
+      setConn("offline");
+      scheduleReconnect();
+    };
+    sock.onerror = () => { try { sock.close(); } catch (_e) { /* ignore */ } };
+  }
+
+  // ---------- render entry point ----------
+  function render(s) {
+    if (!s || typeof s !== "object") return;
+    // ignore a stale GET /api/state that arrives after a newer WS message
+    if (S && isNum(s.now) && isNum(S.now) && s.now < S.now) return;
+    S = s;
+    renderHeader();
+    renderVenue("k", S.kalshi);
+    renderVenue("p", S.polymarket);
+    renderCombos();
+    renderStats();
+    renderCharts();
+    renderEventFilter();
+    renderTrades(false);
+    tick();
+  }
+
+  // ---------- header, venues, countdowns ----------
+  const closeMs = () => toMs(S?.kalshi?.closeTime) ?? toMs(S?.polymarket?.closeTime) ?? toMs(S?.eventKey);
+  const openMs = () => toMs(S?.kalshi?.openTime) ?? toMs(S?.polymarket?.openTime);
+
+  function renderHeader() {
+    setText("btc", fmtUsd(S.btcPrice));
+    const o = openMs();
+    const c = closeMs();
+    setText("window", o == null && c == null ? DASH : `${fmtHM(o)} → ${fmtHM(c)}`);
+    setText("event-trades", isNum(S.tradesThisEvent)
+      ? `${S.tradesThisEvent} / ${isNum(S.maxTradesPerEvent) ? S.maxTradesPerEvent : DASH}`
+      : DASH);
+  }
+
+  function renderVenue(p, v) {
+    setText(`${p}-market`, v?.marketId ?? DASH);
+    setText(`${p}-title`, v?.title ?? "Waiting for market data...");
+    setText(`${p}-strike`, fmtUsd(v?.strike));
+    setText(`${p}-upAsk`, fmtCents(v?.upAsk));
+    setText(`${p}-upBid`, fmtCents(v?.upBid));
+    setText(`${p}-downAsk`, fmtCents(v?.downAsk));
+    setText(`${p}-downBid`, fmtCents(v?.downBid));
+    $(`panel-${p}`).classList.toggle("offline", !v);
+  }
+
+  function tick() {
+    const now = Date.now();
+    if (conn === "live" && now - lastMsgAt > 5000) setConn("stale");
+
+    const c = closeMs();
+    const left = c == null ? null : c - now;
+    setText("closes", fmtCountdown(left));
+    $("closes").classList.toggle("warn-text", left != null && left > 0 && left < 60000);
+
+    if (S) {
+      setText("k-left", venueLeft(S.kalshi, now));
+      setText("p-left", venueLeft(S.polymarket, now));
+    }
+  }
+
+  function venueLeft(v, now) {
+    const t = toMs(v?.closeTime);
+    return t == null ? DASH : fmtCountdown(t - now);
+  }
+
+  // ---------- arbitrage combos ----------
+  function renderCombos() {
+    const max = S.maxTotalCost;
+    setText("max-cost", fmtCents(max));
+    for (const cb of S.combos || []) {
+      const slot = COMBO_SLOT[cb.id];
+      if (!slot) continue;
+      const cost = cb.totalCost;
+      const profit = cb.profitIfOneWins;
+      const tradable = typeof cb.tradable === "boolean"
+        ? cb.tradable
+        : isNum(cost) && isNum(max) && cost < max;
+      const pct = isNum(cost) && cost > 0 && isNum(profit) ? (profit / cost) * 100 : null;
+
+      setText(`${slot}-kside`, cb.kalshiSide ?? DASH);
+      setText(`${slot}-pside`, cb.polySide ?? DASH);
+      setText(`${slot}-kask`, `Ask ${fmtCents(cb.kalshiAsk)}`);
+      setText(`${slot}-pask`, `Ask ${fmtCents(cb.polyAsk)}`);
+      setText(`${slot}-cost`, fmtCents(cost));
+      setText(`${slot}-profit`, isNum(profit) ? `${fmtCents(profit)} (${fmtPct(pct, 1)})` : DASH);
+      $(`${slot}-profit`).className = signCls(profit);
+
+      const badge = $(`${slot}-badge`);
+      const label = tradable ? "TRADABLE" : cost == null ? "NO QUOTE" : "ABOVE MAX";
+      if (badge.textContent !== label) badge.textContent = label;
+      badge.className = "badge " + (tradable ? "ok" : "off");
+      $(`${slot}-card`).classList.toggle("tradable", tradable);
+    }
+  }
+
+  // ---------- stats ----------
+  function renderStats() {
+    const st = S.stats || {};
+    setText("s-pnl", fmtMoney(st.totalPnlUsd));
+    $("s-pnl").className = signCls(st.totalPnlUsd);
+    setText("s-win", isNum(st.winRate) ? `${st.winRate.toFixed(1)}%` : DASH);
+    setText("s-wl", `${isNum(st.wins) ? st.wins : DASH} / ${isNum(st.losses) ? st.losses : DASH}`);
+    setText("s-oc", `${isNum(st.openTrades) ? st.openTrades : DASH} / ${isNum(st.settledTrades) ? st.settledTrades : DASH}`);
+    setText("s-stake", fmtUsd(st.totalStakeUsd));
+  }
+
+  // ---------- charts (created once, updated in place) ----------
+  function initCharts() {
+    if (!window.Chart) {
+      setText("cost-empty", "Chart.js failed to load from the CDN");
+      setText("pnl-empty", "Chart.js failed to load from the CDN");
+      return;
+    }
+    Chart.defaults.color = "#8a96b0";
+    Chart.defaults.borderColor = "#1f2a40";
+    Chart.defaults.font.family = "system-ui, -apple-system, Segoe UI, Roboto, sans-serif";
+
+    const timeAxis = {
+      type: "linear",
+      ticks: { maxTicksLimit: 6, callback: (v) => fmtHM(v) },
+      grid: { color: "#1f2a40" },
+    };
+
+    costChart = new Chart($("costChart"), {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            label: "Kalshi UP + Polymarket DOWN",
+            data: [], borderColor: "#38bdf8", backgroundColor: "#38bdf8",
+            borderWidth: 2, pointRadius: 0, tension: 0.2, spanGaps: false,
+          },
+          {
+            label: "Kalshi DOWN + Polymarket UP",
+            data: [], borderColor: "#f59e0b", backgroundColor: "#f59e0b",
+            borderWidth: 2, pointRadius: 0, tension: 0.2, spanGaps: false,
+          },
+          {
+            label: "Max total cost",
+            data: [], borderColor: "#ef4444", borderDash: [6, 6],
+            borderWidth: 1.5, pointRadius: 0, fill: false,
+          },
+        ],
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "nearest", intersect: false },
+        scales: {
+          x: timeAxis,
+          y: { ticks: { callback: (v) => `${v}¢` }, grid: { color: "#1f2a40" } },
+        },
+        plugins: {
+          legend: { labels: { boxWidth: 12, boxHeight: 2 } },
+          tooltip: {
+            callbacks: {
+              title: (items) => (items.length ? fmtTime(items[0].parsed.x) : ""),
+              label: (c) => `${c.dataset.label}: ${fmtCents(c.parsed.y)}`,
+            },
+          },
+        },
+      },
+    });
+
+    pnlChart = new Chart($("pnlChart"), {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            label: "Cumulative PnL",
+            data: [], borderColor: "#22c55e", borderWidth: 2, pointRadius: 0,
+            pointHoverRadius: 4, tension: 0.15, spanGaps: true,
+            segment: {
+              borderColor: (c) => (c.p1.parsed.y < 0 ? "#ef4444" : "#22c55e"),
+            },
+          },
+          {
+            label: "Break-even",
+            data: [], borderColor: "#8a96b0", borderDash: [4, 4],
+            borderWidth: 1, pointRadius: 0, fill: false,
+          },
+        ],
+      },
+      options: {
+        animation: false,
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: "nearest", intersect: false },
+        scales: {
+          x: timeAxis,
+          y: { ticks: { callback: (v) => fmtMoney(v) }, grid: { color: "#1f2a40" } },
+        },
+        plugins: {
+          legend: { labels: { boxWidth: 12, boxHeight: 2 } },
+          tooltip: {
+            callbacks: {
+              title: (items) => (items.length ? fmtTime(items[0].parsed.x) : ""),
+              label: (c) => `${c.dataset.label}: ${fmtMoney(c.parsed.y)}`,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  function renderCharts() {
+    if (!costChart && !pnlChart) return; // Chart.js missing: messages already shown
+    const ch = S.costHistory || [];
+    const ph = S.pnlHistory || [];
+    const max = S.maxTotalCost;
+
+    if (costChart) {
+      costChart.data.datasets[0].data = ch.map((p) => ({ x: p.ts, y: isNum(p.costKUpPDown) ? p.costKUpPDown : null }));
+      costChart.data.datasets[1].data = ch.map((p) => ({ x: p.ts, y: isNum(p.costKDownPUp) ? p.costKDownPUp : null }));
+      costChart.data.datasets[2].data = ch.length && isNum(max)
+        ? [{ x: ch[0].ts, y: max }, { x: ch[ch.length - 1].ts, y: max }]
+        : [];
+      costChart.update("none");
+    }
+    if (pnlChart) {
+      const pts = ph.map((p) => ({ x: p.ts, y: isNum(p.cumPnlUsd) ? p.cumPnlUsd : 0 }));
+      pnlChart.data.datasets[0].data = pts;
+      pnlChart.data.datasets[1].data = pts.length
+        ? [{ x: pts[0].x, y: 0 }, { x: pts[pts.length - 1].x, y: 0 }]
+        : [];
+      pnlChart.update("none");
+    }
+    $("cost-empty").hidden = ch.length > 0;
+    $("pnl-empty").hidden = ph.length > 0;
+  }
+
+  // ---------- trades ----------
+  function renderEventFilter() {
+    const keys = [];
+    for (const t of S.recentTrades || []) {
+      if (t.eventKey && !keys.includes(t.eventKey)) keys.push(t.eventKey);
+    }
+    const sig = keys.join("|");
+    if (sig === eventSig) return;
+    eventSig = sig;
+    const sel = $("f-event");
+    const cur = sel.value;
+    sel.innerHTML = `<option value="all">All events</option>` + keys
+      .map((k) => `<option value="${esc(k)}">${esc(fmtClock(toMs(k)))}</option>`).join("");
+    sel.value = cur === "all" || keys.includes(cur) ? cur : "all";
+  }
+
+  function passesStatus(t, st) {
+    const settled = t.status === "SETTLED";
+    switch (st) {
+      case "open": return t.status === "OPEN";
+      case "settled": return settled;
+      case "won": return settled && isNum(t.pnlUsd) && t.pnlUsd > 0;
+      case "lost": return settled && isNum(t.pnlUsd) && t.pnlUsd < 0;
+      default: return true;
+    }
+  }
+
+  function statusTag(t) {
+    if (t.status === "OPEN") return `<span class="tag open">OPEN</span>`;
+    const p = t.pnlUsd;
+    if (!isNum(p)) return `<span class="tag settled">SETTLED</span>`;
+    if (p > 0) return `<span class="tag won">WON</span>`;
+    if (p < 0) return `<span class="tag lost">LOST</span>`;
+    return `<span class="tag flat">FLAT</span>`;
+  }
+
+  const sideTxt = (side, price) => `${esc(side ?? DASH)} @ ${fmtCents(price)}`;
+
+  function tradeRow(t, isOpen) {
+    return `<tr class="trade-row${isOpen ? " open" : ""}" data-id="${esc(t.id)}" tabindex="0" aria-expanded="${isOpen}">
+      <td class="mono">#${esc(t.seq ?? DASH)}</td>
+      <td>${esc(fmtClock(toMs(t.eventKey)))}</td>
+      <td class="mono">${esc(fmtTime(t.openedAt))}</td>
+      <td>${esc(COMBO_SHORT[t.combo] ?? t.combo ?? DASH)}</td>
+      <td class="mono">${sideTxt(t.kalshiSide, t.kalshiPrice)}</td>
+      <td class="mono">${sideTxt(t.polySide, t.polyPrice)}</td>
+      <td class="num">${fmtCents(t.totalCost)}</td>
+      <td class="num">${esc(t.contracts ?? DASH)}</td>
+      <td class="num">${fmtUsd(t.stakeUsd)}</td>
+      <td>${statusTag(t)}</td>
+      <td class="num ${signCls(t.pnlUsd)}">${fmtMoney(t.pnlUsd)}</td>
+      <td><button class="why" type="button">${isOpen ? "Hide" : "Why?"}</button></td>
+    </tr>`;
+  }
+
+  const legResult = (won) => won === true
+    ? `<span class="pos">WON</span>`
+    : won === false ? `<span class="neg">LOST</span>` : `<span class="muted">pending</span>`;
+  const row = (k, v) => `<div class="kv-row"><span>${k}</span><b>${v}</b></div>`;
+
+  function detailRow(t) {
+    const pending = `<span class="muted">pending</span>`;
+    const kS = isNum(t.kalshiStrike) ? t.kalshiStrike : null;
+    const pS = isNum(t.polyStrike) ? t.polyStrike : null;
+    let strikeNote = "";
+    if (kS != null && pS != null) {
+      const diff = Math.abs(pS - kS);
+      if (diff > 0.005) {
+        strikeNote = `<p class="warn" style="margin-top:8px">Strikes differ by ${fmtUsd(diff)}. If BTC closes between the two strikes, the two venues settle in opposite directions and both legs of this combo can lose.</p>`;
+      }
+    } else {
+      strikeNote = `<p class="muted" style="margin-top:8px">One strike is missing, so the strike match cannot be checked.</p>`;
+    }
+
+    const entry = `
+      <div>
+        <h4>Why this trade</h4>
+        <p>${esc(t.entryReason || "No reason recorded.")}</p>
+        <div style="margin-top:10px">
+          ${row("Kalshi strike", fmtUsd(kS))}
+          ${row("Polymarket strike", fmtUsd(pS))}
+          ${row("BTC at entry", fmtUsd(t.btcAtEntry))}
+          ${row("Opened", esc(fmtClock(t.openedAt)) + " " + esc(fmtTime(t.openedAt)))}
+        </div>
+        ${strikeNote}
+      </div>`;
+
+    const settled = t.status === "SETTLED";
+    const results = `
+      <div>
+        <h4>Real results</h4>
+        ${row("Kalshi result", t.kalshiResult ? esc(t.kalshiResult) : pending)}
+        ${row("Polymarket result", t.polyResult ? esc(t.polyResult) : pending)}
+        ${row("Kalshi leg (" + esc(t.kalshiSide ?? DASH) + " @ " + fmtCents(t.kalshiPrice) + ")", legResult(t.kalshiLegWon))}
+        ${row("Polymarket leg (" + esc(t.polySide ?? DASH) + " @ " + fmtCents(t.polyPrice) + ")", legResult(t.polyLegWon))}
+        ${row("BTC at settle", settled ? fmtUsd(t.btcAtSettle) : pending)}
+        ${row("Stake", fmtUsd(t.stakeUsd))}
+        ${row("Payout", isNum(t.payoutUsd) ? fmtUsd(t.payoutUsd) : pending)}
+        ${row("PnL", `<span class="${signCls(t.pnlUsd)}">${fmtMoney(t.pnlUsd)}</span>`)}
+        ${row("Settled", settled && t.settledAt ? esc(fmtClock(t.settledAt)) + " " + esc(fmtTime(t.settledAt)) : pending)}
+        <p class="outcome">${esc(t.outcomeReason || (settled ? "No outcome explanation recorded." : "Still open, waiting for both events to settle."))}</p>
+      </div>`;
+
+    return `<tr class="detail-row"><td colspan="12"><div class="detail">${entry}${results}</div></td></tr>`;
+  }
+
+  function renderTrades(force) {
+    const ev = $("f-event").value;
+    const st = $("f-status").value;
+    const all = S?.recentTrades || [];
+    const list = all.filter((t) => (ev === "all" || t.eventKey === ev) && passesStatus(t, st));
+
+    const sig = JSON.stringify([ev, st, [...expanded], list]);
+    setText("trade-count", `${list.length} of ${all.length} trades`);
+    if (!force && sig === lastTradesSig) return;
+    lastTradesSig = sig;
+
+    const body = $("trade-body");
+    if (!list.length) {
+      body.innerHTML = `<tr><td class="empty" colspan="12">No trades match these filters yet.</td></tr>`;
+      return;
+    }
+
+    // per-event PnL subtotals for group headers (only when showing all events)
+    const groupCount = new Map();
+    const groupPnl = new Map();
+    for (const t of list) {
+      groupCount.set(t.eventKey, (groupCount.get(t.eventKey) || 0) + 1);
+      if (isNum(t.pnlUsd)) groupPnl.set(t.eventKey, (groupPnl.get(t.eventKey) || 0) + t.pnlUsd);
+    }
+
+    const out = [];
+    let lastEvent = null;
+    for (const t of list) {
+      if (ev === "all" && t.eventKey !== lastEvent) {
+        lastEvent = t.eventKey;
+        const pnl = groupPnl.get(t.eventKey);
+        out.push(`<tr class="group"><td colspan="12">
+          Event closing ${esc(fmtClock(toMs(t.eventKey)))}
+          <span class="muted" style="font-weight:400"> · ${groupCount.get(t.eventKey)} trades · PnL </span>
+          <span class="${signCls(pnl)}">${fmtMoney(pnl)}</span></td></tr>`);
+      }
+      const isOpen = expanded.has(t.id);
+      out.push(tradeRow(t, isOpen));
+      if (isOpen) out.push(detailRow(t));
+    }
+    body.innerHTML = out.join("");
+  }
+
+  function toggleTrade(id) {
+    if (expanded.has(id)) expanded.delete(id); else expanded.add(id);
+    renderTrades(true);
+  }
+
+  // ---------- wiring ----------
+  $("trade-body").addEventListener("click", (e) => {
+    const tr = e.target.closest("tr.trade-row");
+    if (tr) toggleTrade(Number(tr.dataset.id));
+  });
+  $("trade-body").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter" && e.key !== " ") return;
+    const tr = e.target.closest("tr.trade-row");
+    if (!tr) return;
+    e.preventDefault();
+    toggleTrade(Number(tr.dataset.id));
+  });
+  $("f-event").addEventListener("change", () => renderTrades(true));
+  $("f-status").addEventListener("change", () => renderTrades(true));
+
+  initCharts();
+  setConn("connecting");
+  connect();
+  setInterval(tick, 500);
+
+  // initial snapshot; the WebSocket keeps it fresh afterwards
+  fetch("/api/state", { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((s) => { if (s) render(s); })
+    .catch(() => { /* WebSocket will deliver state */ });
+})();
+</script>
+</body>
+</html>
