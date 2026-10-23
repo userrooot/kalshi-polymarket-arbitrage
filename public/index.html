@@ -128,7 +128,15 @@ main { padding: 16px; display: grid; gap: 16px; max-width: 1400px; margin: 0 aut
 .spot-lean { display: block; font-family: inherit; font-size: 11px; font-weight: 400; color: var(--muted); }
 .spot-note { font-size: 11px; color: var(--muted); margin-top: 10px; }
 .spot-age { font-size: 11px; margin-top: 4px; }
-.badge.fb { background: var(--amber); color: #111; }
+.spot-price.nofeed { color: var(--red); font-size: 18px; font-weight: 700; white-space: normal; }
+.spot-err { font-size: 12px; color: var(--red); overflow-wrap: anywhere; margin-bottom: 4px; }
+.spot-settle { margin-top: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--amber); background: rgba(245, 158, 11, .12); }
+.spot-settle label { color: var(--amber); }
+.spot-settle b { font-family: var(--mono); font-size: 18px; color: var(--amber); }
+.strike-src { font-size: 11px; margin-top: 2px; overflow-wrap: anywhere; }
+.alerts { display: grid; gap: 8px; padding: 10px 14px; background: rgba(239, 68, 68, .14); border: 1px solid var(--red); border-radius: 10px; }
+.alerts-body { display: grid; gap: 4px; font-weight: 600; color: #fecaca; overflow-wrap: anywhere; }
+.alerts .why { justify-self: end; color: #fecaca; border-color: var(--red); }
 .badge.stale-b { background: #2a3550; color: var(--amber); }
 .fresh { font-size: 12px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
 .fresh b { color: var(--text); font-weight: 600; }
@@ -245,6 +253,11 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
 
 <main>
 
+  <section class="alerts" id="alerts" role="alert" hidden>
+    <div class="alerts-body" id="alerts-body"></div>
+    <button type="button" class="why" id="alerts-dismiss">Dismiss</button>
+  </section>
+
   <section class="feeds" id="feeds" aria-label="Feed status">
     <div class="feed-list" id="feed-list"><span class="muted">Waiting for feed status...</span></div>
     <div class="rates">
@@ -276,21 +289,24 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
         <div class="spot-top">
           <span class="spot-label">Live BTC spot</span>
           <span class="spot-flags">
-            <span class="badge fb" id="k-spot-fb" hidden>fallback</span>
             <span class="badge stale-b" id="k-spot-stale" hidden>stale</span>
           </span>
         </div>
         <div class="spot-price" id="k-spot-price">—</div>
-        <div class="spot-src muted" id="k-spot-src">CF Benchmarks BRTI (live index, 5Hz)</div>
+        <div class="spot-err" id="k-spot-err" hidden></div>
+        <div class="spot-src muted" id="k-spot-src">CF Benchmarks BRTI (official, Kalshi websocket)</div>
         <div class="spot-sub">
-          <div><label>60s avg (settlement estimate)</label><b id="k-spot-avg">—</b></div>
+          <div><label>60s avg (Kalshi-provided)</label><b id="k-spot-avg">—</b></div>
           <div><label>Spot − strike</label><b id="k-spot-diff">—</b></div>
         </div>
-        <p class="spot-note" id="k-spot-note" hidden>BRTI itself is licensed and has no free live feed. This is a median of exchange mids, so expect about ±$3 versus the index.</p>
+        <div class="spot-settle" id="k-spot-settle" hidden>
+          <label>Settlement value (final minute)</label>
+          <b id="k-spot-settle-val">—</b>
+        </div>
         <div class="spot-age muted" id="k-spot-age">—</div>
       </div>
       <div class="kv">
-        <div><label>Strike (price to beat)</label><b id="k-strike">—</b></div>
+        <div><label>Strike (price to beat)</label><b id="k-strike">—</b><div class="strike-src muted" id="k-strike-src"></div></div>
         <div><label>Time left</label><b id="k-left">—</b></div>
       </div>
       <table class="quote">
@@ -313,21 +329,21 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
         <div class="spot-top">
           <span class="spot-label">Live BTC spot</span>
           <span class="spot-flags">
-            <span class="badge fb" id="p-spot-fb" hidden>fallback</span>
             <span class="badge stale-b" id="p-spot-stale" hidden>stale</span>
           </span>
         </div>
         <div class="spot-price" id="p-spot-price">—</div>
-        <div class="spot-src muted" id="p-spot-src">Chainlink BTC/USD</div>
+        <div class="spot-err" id="p-spot-err" hidden></div>
+        <div class="spot-src muted" id="p-spot-src">Polymarket resolution source (Chainlink)</div>
         <div class="spot-sub">
           <div><label>60s avg (settlement estimate)</label><b id="p-spot-avg">—</b></div>
           <div><label>Spot − strike</label><b id="p-spot-diff">—</b></div>
         </div>
-        <p class="spot-note">Streamed via Polymarket RTDS.</p>
+        <p class="spot-note" id="p-spot-note" hidden></p>
         <div class="spot-age muted" id="p-spot-age">—</div>
       </div>
       <div class="kv">
-        <div><label>Strike (price to beat)</label><b id="p-strike">—</b></div>
+        <div><label>Strike (price to beat)</label><b id="p-strike">—</b><div class="strike-src muted" id="p-strike-src"></div></div>
         <div><label>Time left</label><b id="p-left">—</b></div>
       </div>
       <table class="quote">
@@ -568,6 +584,7 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     S = s;
     renderedAt = Date.now();
     renderHeader();
+    renderAlerts();
     renderVenue("k", S.kalshi);
     renderVenue("p", S.polymarket);
     renderFeeds();
@@ -597,6 +614,7 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     setText(`${p}-market`, v?.marketId ?? DASH);
     setText(`${p}-title`, v?.title ?? "Waiting for market data...");
     setText(`${p}-strike`, fmtUsd(v?.strike));
+    setText(`${p}-strike-src`, isNum(v?.strike) ? (v?.strikeSource ?? "") : "not available yet");
     setText(`${p}-upAsk`, fmtCents(v?.upAsk));
     setText(`${p}-upBid`, fmtCents(v?.upBid));
     setText(`${p}-downAsk`, fmtCents(v?.downAsk));
@@ -607,14 +625,20 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
   }
 
   // ---------- live BTC spot, quote freshness, feeds ----------
+  const NO_FEED = "— no official feed";
+  // only official sources are known; anything else is treated as "no feed"
   const SPOT_SRC = {
-    chainlink: "Chainlink BTC/USD (spot, not TWAP)",
+    cfbenchmarks: "CF Benchmarks BRTI (official, Kalshi websocket)",
     "chainlink-twap": "Chainlink 60s TWAP (Polymarket resolution source)",
-    cfbenchmarks: "CF Benchmarks BRTI (live index, 5Hz)",
-    "brti-proxy": "≈ BRTI proxy (median of 6 exchanges)",
-    "coinbase-rest": "Coinbase REST",
+    chainlink: "Chainlink BTC/USD spot (not TWAP)",
   };
-  const SPOT_DEFAULT = { k: "brti-proxy", p: "chainlink" };
+  const SPOT_NAME = { k: "CF Benchmarks BRTI (official, Kalshi websocket)", p: "Polymarket resolution source (Chainlink)" };
+  const SPOT_NOTE_P = {
+    "chainlink-twap": "Streamed via Polymarket RTDS. This 60s TWAP is the value Polymarket resolves on.",
+    chainlink: "Streamed via Polymarket RTDS. Plain spot, not the 60s TWAP, so it can differ from the resolution value.",
+  };
+  const spotKnown = (v) => v?.spotSource != null
+    && Object.prototype.hasOwnProperty.call(SPOT_SRC, v.spotSource) && isNum(v.spot);
   const STALE_MS = 5000;
 
   const fmtAge = (ms) => (isNum(ms)
@@ -638,24 +662,43 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
   };
 
   function renderSpot(p, v) {
-    const price = isNum(v?.spot) ? v.spot : null;
-    setText(`${p}-spot-price`, fmtUsd(price));
-    if (price != null && lastSpot[p] != null && price !== lastSpot[p]) {
-      flash($(`${p}-spot-price`), price > lastSpot[p] ? "flash-up" : "flash-down");
+    const known = spotKnown(v);
+    const price = known ? v.spot : null;
+    const priceEl = $(`${p}-spot-price`);
+    const errEl = $(`${p}-spot-err`);
+    if (price == null) {
+      // no official feed: never show a number, say why instead
+      priceEl.classList.add("nofeed");
+      setText(`${p}-spot-price`, NO_FEED);
+      const reason = v?.spotError
+        ?? (isNum(v?.spot) && !known ? `unrecognised spot source "${v?.spotSource ?? "none"}"` : "");
+      setText(`${p}-spot-err`, reason ? `Reason: ${reason}` : "");
+      errEl.hidden = !reason;
+    } else {
+      priceEl.classList.remove("nofeed");
+      setText(`${p}-spot-price`, fmtUsd(price));
+      setText(`${p}-spot-err`, "");
+      errEl.hidden = true;
+      if (lastSpot[p] != null && price !== lastSpot[p]) {
+        flash(priceEl, price > lastSpot[p] ? "flash-up" : "flash-down");
+      }
     }
     lastSpot[p] = price;
 
-    const srcKey = v?.spotSource ?? SPOT_DEFAULT[p];
-    setText(`${p}-spot-src`, SPOT_SRC[srcKey] ?? String(srcKey));
-    $(`${p}-spot-fb`).hidden = srcKey !== "coinbase-rest";
-    // only the Kalshi panel's BRTI proxy is approximate (about ±$3 versus the index)
-    if (p === "k") {
-      const approx = srcKey === "brti-proxy";
-      $("k-spot-note").hidden = !approx;
-      $("k-spot-src").title = approx ? "BRTI is licensed, so this is an approximation of the index" : "";
+    setText(`${p}-spot-src`, known ? SPOT_SRC[v.spotSource] : SPOT_NAME[p]);
+    if (p === "p") {
+      const note = known ? SPOT_NOTE_P[v.spotSource] : undefined;
+      setText("p-spot-note", note ?? "");
+      $("p-spot-note").hidden = !note;
     }
-    setText(`${p}-spot-avg`, fmtUsd(v?.spotAvg60));
+    if (p === "k") {
+      const settle = isNum(v?.spotSettle) ? v.spotSettle : null;
+      $("k-spot-settle").hidden = settle == null;
+      setText("k-spot-settle-val", fmtUsd(settle));
+    }
+    setText(`${p}-spot-avg`, price != null && isNum(v?.spotAvg60) ? fmtUsd(v.spotAvg60) : DASH);
 
+    // Spot - strike only when both exist
     const strike = isNum(v?.strike) ? v.strike : null;
     const dEl = $(`${p}-spot-diff`);
     if (price == null || strike == null) {
@@ -670,6 +713,30 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     }
   }
 
+  // ---------- alerts banner (red; dismiss holds only until the alerts change) ----------
+  let alertSig = "";            // signature of the alerts currently rendered
+  let alertDismissedSig = null; // signature the viewer dismissed
+  function renderAlerts() {
+    const list = Array.isArray(S?.alerts)
+      ? S.alerts.filter((a) => typeof a === "string" && a.trim() !== "") : [];
+    const sig = list.join("\n");
+    alertSig = sig;
+    if (!list.length) alertDismissedSig = null;
+    const box = $("alerts");
+    const show = list.length > 0 && sig !== alertDismissedSig;
+    box.hidden = !show;
+    if (show && box.dataset.sig !== sig) {
+      const body = $("alerts-body");
+      body.textContent = "";
+      for (const msg of list) {
+        const line = document.createElement("div");
+        line.textContent = msg;
+        body.appendChild(line);
+      }
+      box.dataset.sig = sig;
+    }
+  }
+
   // runs every tick so staleness and ages advance even without new messages
   function updateLive(now) {
     for (const p of ["k", "p"]) {
@@ -678,7 +745,7 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
       const stale = isNum(age) && age > STALE_MS;
       $(`${p}-spot`).classList.toggle("stale", stale);
       $(`${p}-spot-stale`).hidden = !stale;
-      setText(`${p}-spot-age`, isNum(age) ? `spot updated ${fmtAge(age)} ago` : DASH);
+      setText(`${p}-spot-age`, spotKnown(v) && isNum(age) ? `spot updated ${fmtAge(age)} ago` : "no spot update");
       const qAge = isNum(v?.quoteAgeMs) ? v.quoteAgeMs + (now - renderedAt) : null;
       setText(`${p}-qage`, fmtAge(qAge));
     }
@@ -1095,6 +1162,10 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
   });
   $("f-event").addEventListener("change", () => renderTrades(true));
   $("f-status").addEventListener("change", () => renderTrades(true));
+  $("alerts-dismiss").addEventListener("click", () => {
+    alertDismissedSig = alertSig;
+    $("alerts").hidden = true;
+  });
 
   initCharts();
   setConn("connecting");

@@ -37,14 +37,15 @@ bun run start
 
 Then open http://localhost:3000.
 
-No API keys are required. The dashboard runs on public data alone. The optional authenticated websocket settings in `.env.example` add faster and more accurate feeds (see [Live data & update rates](#live-data--update-rates)).
+Polymarket prices and spot run on public data without keys. The Kalshi spot panel needs a Kalshi API key, because its only spot source is the official CF Benchmarks BRTI index (see [Spot sources](#spot-sources)). Without a key that panel shows `— no official feed` with the reason, and no estimate is substituted. The other optional websocket settings in `.env.example` add faster feeds (see [Live data & update rates](#live-data--update-rates)).
 
 Keep `.env` and any `*.pem` key file out of git. Both are listed in `.gitignore`. Secrets are never logged.
 
 ## Reading the dashboard
 
 - **Header**: connection dot (green live, amber connecting or stale, red disconnected), BTC price, the current event window with a countdown to close, and trades opened in this event versus the limit.
-- **Kalshi / Polymarket panels**: market id, strike (price to beat), Up and Down ask and bid in cents, and time left.
+- **Kalshi / Polymarket panels**: market id, strike (price to beat) with its source underneath, the live BTC spot with its official source, Up and Down ask and bid in cents, and time left. The strike shows `—` and `not available yet` until it is published. The spot shows `— no official feed` and the reason when no official feed is available.
+- **Alerts banner**: a red banner at the top lists problems such as a missing API key or failed authentication, one per line. Dismiss hides it until the messages change.
 - **Arbitrage combos**: each combo's two asks, total cost, and locked profit. A green **TRADABLE** badge means the total cost is below the max.
 - **Charts**: live total cost of both combos against the dashed max line, and cumulative PnL (green above zero, red below).
 - **Stats**: total PnL, win rate, wins and losses, open and settled trades, and total staked.
@@ -59,8 +60,8 @@ Prices are in cents (66¢ = $0.66 per contract). Money uses signed notation such
 
 ## Live data & update rates
 
-- **Polymarket spot** is Chainlink BTC/USD, streamed through the Polymarket RTDS websocket. Polymarket resolves on this feed.
-- **Kalshi** resolves on the CF Benchmarks BRTI index. BRTI has no free live feed, so the dashboard shows a median of constituent-exchange mids as an approximation (expect about ±$3 versus the index). The 60s average on each panel is the settlement estimate.
+- **Polymarket spot** comes from Polymarket's RTDS websocket. It is the Chainlink 60s TWAP when `POLY_API_KEY` is set, and plain Chainlink BTC/USD spot otherwise. Polymarket resolves on the TWAP.
+- **Kalshi** resolves on the CF Benchmarks BRTI index. The Kalshi panel shows only that official value, streamed over Kalshi's websocket, and it needs `KALSHI_API_KEY_ID` and a private key. Without keys it shows `— no official feed` and never estimates the index. When Kalshi publishes its final-minute value, a highlighted `Settlement value (final minute)` row appears.
 - **Up/Down prices** for Polymarket are pushed over the CLOB websocket. For Kalshi they come from REST polling every `KALSHI_BOOK_POLL_MS` (350 ms by default), unless a Kalshi API key websocket is configured.
 - Each panel shows where its quotes came from (`WS push` or `REST`) and how old they are. A spot price older than 5 s is grayed out and marked stale.
 - The Feeds strip shows, per feed: connection status, messages/s, price updates/s, latency and last-message age. Below the feeds, a summary line gives the Kalshi and Polymarket Up/Down updates/s, with `(ws)` or `(rest)` for how Kalshi quotes arrive. Tick and broadcast rates are at the right.
@@ -70,24 +71,25 @@ Prices are in cents (66¢ = $0.66 per contract). Money uses signed notation such
 | | Without API keys | With API keys |
 | --- | --- | --- |
 | Kalshi Up/Down prices | REST poll every `KALSHI_BOOK_POLL_MS` (350 ms default), shown as `REST` | Kalshi websocket push, shown as `WS push` (`kalshiBookWs` feed) |
-| Kalshi spot (settles on BRTI) | Approximation: median of exchange mids, about ±$3 versus the index | CF Benchmarks BRTI live index, 5 Hz, via the Kalshi websocket |
+| Kalshi spot (settles on BRTI) | `— no official feed` with the reason, no estimate | CF Benchmarks BRTI (official), via the Kalshi websocket |
 | Polymarket Up/Down prices | CLOB websocket push | CLOB websocket push (same) |
 | Polymarket spot (resolves on Chainlink) | Chainlink BTC/USD spot, not TWAP | Chainlink 60s TWAP via Polymarket's live-data websocket (the actual resolution source) |
 
-Without keys the dashboard works on public data. The authenticated websockets are optional but strongly recommended, because they remove most of the polling delay on Kalshi and match the exact settlement sources.
+Without keys both venues still price on public data, but the Kalshi spot panel has no official feed. The authenticated websockets are strongly recommended, because they supply the Kalshi spot and remove most of the polling delay on Kalshi.
 
 ### Spot sources
 
-- **Kalshi** resolves on the CF Benchmarks BRTI index. With `KALSHI_API_KEY_ID` and a private key, BRTI is streamed through the Kalshi websocket at 5 Hz (`CF Benchmarks BRTI (live index, 5Hz)`). Without keys, the dashboard shows a median of constituent-exchange mids (`≈ BRTI proxy`, expect about ±$3 versus the index).
-- **Polymarket** resolves on the Chainlink BTC/USD 60s TWAP. With `POLY_API_KEY`, `POLY_API_SECRET` and `POLY_API_PASSPHRASE`, the TWAP is streamed via Polymarket's live-data websocket (`Chainlink 60s TWAP`). Without them, the dashboard shows plain Chainlink BTC/USD spot (`not TWAP`).
-- The 60s average on each panel is the settlement estimate for both venues.
+- **Kalshi** resolves on the CF Benchmarks BRTI index. The only spot shown on the Kalshi panel is that official index, `CF Benchmarks BRTI (official, Kalshi websocket)`, streamed over Kalshi's authenticated websocket (`cfbenchmarks_value`). It needs `KALSHI_API_KEY_ID` and a private key (`KALSHI_PRIVATE_KEY_PATH` or `KALSHI_PRIVATE_KEY`). If the feed is missing, the panel shows `— no official feed` and the reason, for example `no Kalshi API key`. The dashboard does not substitute an average of other exchanges.
+- **Polymarket** resolves on the Chainlink BTC/USD 60s TWAP. With `POLY_API_KEY`, `POLY_API_SECRET` and `POLY_API_PASSPHRASE`, the TWAP is streamed via Polymarket's live-data websocket (`Chainlink 60s TWAP (Polymarket resolution source)`). Without them, the dashboard shows plain Chainlink BTC/USD spot (`Chainlink BTC/USD spot (not TWAP)`).
+- **Price to beat (strike)**: Kalshi uses the market's `floor_strike`. Polymarket uses the Chainlink price at window start. Each panel shows its source under the strike. The spot-minus-strike figure appears only when both the spot and the strike are known.
+- The Kalshi panel shows a 60s average (`60s avg (Kalshi-provided)`). The Polymarket panel shows a 60s average labelled as a settlement estimate.
 
 ### Enabling the authenticated websockets
 
 1. Create a Kalshi API key and download its private key PEM. Save it as `kalshi_private_key.pem` in the repo root, or use `KALSHI_PRIVATE_KEY` inline.
 2. Create Polymarket CLOB API credentials (key, secret, passphrase).
 3. Fill in the commented-out variables in `.env` (see `.env.example`), then restart with `bun run start`.
-4. Open the dashboard and check the Feeds strip. The Kalshi summary should read `Kalshi Up/Down updates/s: … (ws)`, and the `kalshiBookWs` row should show `connected` with a latency value.
+4. Open the dashboard and check the Feeds strip. The Kalshi summary should read `Kalshi Up/Down updates/s: … (ws)`, and the `kalshiBookWs` row should show `connected` with a latency value. The Kalshi spot panel should show `CF Benchmarks BRTI (official, Kalshi websocket)` with a price, not `— no official feed`.
 
 **Caveat:** the authenticated code paths were built from the official Kalshi and Polymarket docs and tested with mocks only. They have not been run against the live services. Run once locally with real keys before relying on them, and confirm the Feeds strip shows `ws` for Kalshi as described above. If it shows `(rest)` or the feed is disconnected, the dashboard has fallen back to REST polling and the websocket settings need checking.
 
@@ -108,7 +110,7 @@ All settings come from `.env` (see `.env.example`).
 | `KALSHI_BASE_URL` | `https://api.elections.kalshi.com/trade-api/v2` | Kalshi API base URL |
 | `POLY_GAMMA_URL` | `https://gamma-api.polymarket.com` | Polymarket Gamma API URL |
 | `POLY_CLOB_URL` | `https://clob.polymarket.com` | Polymarket CLOB API URL |
-| `KALSHI_API_KEY_ID` | (unset) | Kalshi API key ID. Enables the Kalshi websocket (order book and BRTI) |
+| `KALSHI_API_KEY_ID` | (unset) | Kalshi API key ID. Required for the official BRTI spot. Also enables the Kalshi websocket (order book) |
 | `KALSHI_PRIVATE_KEY_PATH` | (unset) | Path to the Kalshi private key PEM file (`./kalshi_private_key.pem`) |
 | `KALSHI_PRIVATE_KEY` | (unset) | Alternative to the path: the PEM inline, newlines written as `\n` |
 | `KALSHI_WS_URL` | `wss://external-api-ws.kalshi.com/trade-api/ws/v2` | Kalshi authenticated websocket URL |
