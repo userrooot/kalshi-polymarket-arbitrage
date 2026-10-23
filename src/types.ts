@@ -98,6 +98,7 @@ export interface DashboardState {
   maxTradesPerEvent: number;
   contractsPerTrade: number;
   btcPrice: number | null;
+  exec: import("./exec/types.ts").ExecState | null; // realistic execution simulation (null if disabled)
   alerts: string[];          // red banner messages (missing keys, auth failures)
   feeds: FeedStat[];
   tickRate: { ticksPerSec: number; broadcastsPerSec: number };
