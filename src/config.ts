@@ -17,6 +17,7 @@ export const config = {
   tickHeartbeatMs: num("TICK_HEARTBEAT_MS", 1000),
   broadcastMinMs: num("BROADCAST_MIN_MS", 250),
   port: num("PORT", 3000),
+  host: str("HOST", "127.0.0.1"), // dashboard has no auth: loopback by default
   dbPath: str("DB_PATH", "data/sim.sqlite"),
   kalshiBase: str("KALSHI_BASE_URL", "https://api.elections.kalshi.com/trade-api/v2"),
   gammaUrl: str("POLY_GAMMA_URL", "https://gamma-api.polymarket.com"),

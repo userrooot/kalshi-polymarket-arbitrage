@@ -9,9 +9,10 @@ import { startPolyBook } from "./feeds/polyBook.ts";
 import { startExec } from "./exec/index.ts";
 import { fetchKalshi } from "./kalshi.ts";
 import { fetchPolymarket } from "./polymarket.ts";
-import { broadcast, server } from "./server.ts";
+import { broadcast, startDashboard } from "./server.ts";
 import { buildState, onTick, settleDue } from "./simulator.ts";
 
+const server = startDashboard();
 console.log(`[sim] PAPER TRADING ONLY. http://localhost:${server.port}  maxCost<${config.maxTotalCost}¢ x${config.contractsPerTrade} contracts, <=${config.maxTradesPerEvent} trades/event`);
 
 const fmt = (n: number | null) => (n === null ? "--" : String(Math.round(n * 10) / 10));

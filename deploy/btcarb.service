@@ -1,0 +1,29 @@
+[Unit]
+Description=BTC arbitrage simulator (paper trading only) - Kalshi/Polymarket
+After=network-online.target chrony.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/btcarb
+EnvironmentFile=/home/ubuntu/btcarb/.env
+ExecStart=/home/ubuntu/.bun/bin/bun run src/index.ts
+Restart=always
+RestartSec=3
+TimeoutStopSec=20
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+
+# Hardening. ProtectHome=read-only keeps /home/ubuntu readable (bun runs from ~/.bun, only
+# executed/read) while writes are limited to ReadWritePaths. If bun ever fails to start
+# under this sandbox, change ProtectHome to "false" (and drop ReadWritePaths).
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/ubuntu/btcarb
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
