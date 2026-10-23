@@ -1,3 +1,4 @@
+import { getAlerts } from "./alerts.ts";
 import { config } from "./config.ts";
 import { computeCombos } from "./arbitrage.ts";
 import { allTrades, insertTrade, loadEvents, saveEvent, updateTrade } from "./db.ts";
@@ -138,7 +139,7 @@ export function buildState(now: number, btc: number | null, k: VenueSnapshot | n
   const eventKey = k?.closeTime ?? null;
   return {
     now, maxTotalCost: config.maxTotalCost, maxTradesPerEvent: config.maxTradesPerEvent, contractsPerTrade: config.contractsPerTrade,
-    btcPrice: btc, ...extra, kalshi: k, polymarket: p, combos, eventKey,
+    btcPrice: btc, alerts: getAlerts(), ...extra, kalshi: k, polymarket: p, combos, eventKey,
     tradesThisEvent: eventKey ? eventTrades(eventKey).length : 0,
     stats: stats(), costHistory, pnlHistory: pnlHistory(), recentTrades: recentTrades(100),
   };

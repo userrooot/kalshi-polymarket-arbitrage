@@ -2,7 +2,8 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { constants, generateKeyPairSync, verify } from "node:crypto";
 import { kalshiTop, kalshiWatch, startKalshiBook } from "../src/feeds/kalshiBook.ts";
-import { cfAvg60, cfSpot } from "../src/feeds/kalshiIndex.ts";
+import { cfAvg60, cfError, cfReset, cfSettle, cfSpot } from "../src/feeds/kalshiIndex.ts";
+import { getAlerts, resetAlerts } from "../src/alerts.ts";
 import { feedStats } from "../src/feeds/meter.ts";
 import { polyLiveStart, twapAvg60, twapSpot } from "../src/feeds/polyLive.ts";
 
@@ -16,6 +17,7 @@ const pmsgs: any[] = [];
 let pws: any = null, polyAuthOk = false;
 let server: ReturnType<typeof Bun.serve>;
 let dropSeq = false;
+let idxMode: "ok" | "nobrti" | "err24" = "ok";
 
 beforeAll(() => {
   server = Bun.serve({
@@ -46,8 +48,15 @@ beforeAll(() => {
             s({ type: "orderbook_snapshot", sid: 7, seq: 1, sending_ts_ms: Date.now() - 20,
               msg: { market_ticker: j.params.market_tickers[0], clock: 1, yes_dollars_fp: [["0.4000", "100.00"]], no_dollars_fp: [["0.5500", "50.00"]] } });
           } else if (j.cmd === "subscribe") {
-            s({ type: "subscribed", id: j.id, msg: { channel: "cfbenchmarks_value_5hz", sid: 8 } });
-            s({ type: "cfbenchmarks_value_5hz", sid: 8, seq: 1, msg: { index_id: "BRTI", value_usd: "68000.50", source_ts_ms: Date.now(), received_at: Date.now() } });
+            if (idxMode === "err24" || !j.params.index_ids) { s({ type: "error", id: j.id, msg: { code: 24, msg: "index ids required" } }); return; }
+            j.params.channels.forEach((ch: string, i: number) => s({ type: "subscribed", id: j.id, msg: { channel: ch, sid: 8 + i } }));
+            const now = Date.now();
+            s({ type: "cfbenchmarks_value_5hz", sid: 9, seq: 1, msg: { index_id: "BRTI", value_usd: "68000.50", source_ts_ms: now, received_at: now, data: "{}" } });
+            s({ type: "cfbenchmarks_value", sid: 8, seq: 1, sending_ts_ms: now, msg: { index_id: "BRTI", received_at: now, data: JSON.stringify({ value: "67999.25" }),
+              avg_60s_data: { value: "67990.12345678", window_size: 60, window_start_ts_ms: now - 60000, window_end_ts_exclusive: now },
+              last_60s_windowed_average_15min: { value: "67985.5", window_size: 60, window_start_ts_ms: now - 60000, window_end_ts_exclusive: now } } });
+          } else if (j.cmd === "update_subscription" && j.params.action === "indexlist") {
+            s({ type: "ok", id: j.id, sid: j.params.sid, msg: { index_ids: idxMode === "nobrti" ? ["ETHUSD"] : ["BRTI", "ETHUSD"] } });
           } else if (j.cmd === "update_subscription" && j.params.action === "get_snapshot") {
             s({ type: "orderbook_snapshot", sid: 7, seq: 50, sending_ts_ms: Date.now(),
               msg: { market_ticker: j.params.market_tickers[0], clock: 2, yes_dollars_fp: [["0.3000", "10.00"]], no_dollars_fp: [["0.6000", "10.00"]] } });
@@ -85,7 +94,12 @@ describe("mock Kalshi", () => {
     expect(t.yesBid).toBe(40); expect(t.noBid).toBe(45); expect(t.src).toBe("ws");
     await until(() => cfSpot() !== null);
     expect(cfSpot()).toMatchObject({ price: 68000.5, source: "cfbenchmarks" });
-    expect(cfAvg60()).toBeCloseTo(68000.5);
+    expect(cfAvg60()).toBeCloseTo(67990.12345678, 6);
+    expect(cfSettle()).toBe(67985.5);
+    const cfSub = c.cmds.find((x) => x.cmd === "subscribe" && x.params.channels.includes("cfbenchmarks_value"));
+    expect(cfSub.params).toEqual({ channels: ["cfbenchmarks_value", "cfbenchmarks_value_5hz"], index_ids: ["BRTI"] });
+    await until(() => c.cmds.some((x) => x.params?.action === "indexlist"));
+    expect(cfError()).toBeNull();
     const st = feedStats().find((f) => f.name === "kalshiBook(ws)")!;
     expect(st.connected).toBe(true); expect(st.updatesPerSec).toBeGreaterThan(0); expect(st.latencyMs).not.toBeNull();
   });
@@ -140,5 +154,53 @@ describe("mock Polymarket live-data v2", () => {
     expect(twapSpot()).toMatchObject({ price: 68010.25, source: "chainlink-twap" });
     expect(twapAvg60()).toBe(68010.25);
     expect(feedStats().find((f) => f.name === "polyLive")!.latencyMs).not.toBeNull();
+  });
+});
+
+describe("cfbenchmarks edge cases (no fake numbers)", () => {
+  const tick = (o: object) => { const c = kconns.at(-1)!; c.ws.send(JSON.stringify(o)); };
+  test("1Hz tick value comes from data JSON when no 5hz tick; null when stale", async () => {
+    cfReset();
+    const now = Date.now();
+    tick({ type: "cfbenchmarks_value", sid: 8, seq: 5, msg: { index_id: "BRTI", received_at: now, data: JSON.stringify({ value: "70000.1" }), avg_60s_data: { value: "69999.9" } } });
+    await until(() => cfSpot() !== null);
+    expect(cfSpot()!.price).toBe(70000.1);
+    expect(cfAvg60()).toBe(69999.9);
+    expect(cfSettle()).toBeNull(); // only present in the final minute
+    expect(cfSpot(Date.now() + 4000)).toBeNull(); // stale > 3s -> null, not a stale number
+    expect(cfAvg60(Date.now() + 10_000)).toBeNull();
+  });
+  test("5hz value falls back to data.value when value_usd missing; wrong index ignored", () => {
+    cfReset();
+    // direct feed (no socket needed)
+    const { cfOnMessage } = require("../src/feeds/kalshiIndex.ts");
+    cfOnMessage({ type: "cfbenchmarks_value_5hz", msg: { index_id: "ETHUSD", value_usd: "3000" } });
+    expect(cfSpot()).toBeNull();
+    cfOnMessage({ type: "cfbenchmarks_value_5hz", msg: { index_id: "BRTI", data: JSON.stringify({ value: 71000.5 }) } });
+    expect(cfSpot()!.price).toBe(71000.5);
+  });
+  test("error 24 -> unavailable, spot null, alert raised", async () => {
+    cfReset(); resetAlerts();
+    idxMode = "err24";
+    kconns.at(-1)!.ws.close();
+    await until(() => (cfError() ?? "").includes("24"), 4000);
+    expect(cfError()).toContain("24");
+    expect(cfSpot()).toBeNull();
+    expect(getAlerts().join(" ")).toContain("error 24");
+  });
+  test("indexlist without BRTI -> null spot + error", async () => {
+    cfReset(); resetAlerts();
+    idxMode = "nobrti";
+    kconns.at(-1)!.ws.close();
+    await until(() => (cfError() ?? "").includes("not in Kalshi indexlist"), 8000);
+    expect(cfSpot()).toBeNull();
+    expect(getAlerts().join(" ")).toContain("BRTI");
+    idxMode = "ok";
+  });
+  test("successful subscribe clears the kalshi-ws alert", async () => {
+    cfReset();
+    kconns.at(-1)!.ws.close();
+    await until(() => cfSpot() !== null, 8000);
+    expect(getAlerts().join(" ")).not.toContain("BRTI feed unavailable");
   });
 });

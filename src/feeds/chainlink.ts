@@ -32,7 +32,8 @@ export function chainlinkSpot(): SpotQuote | null {
   const l = series.last();
   return l && lastLocal ? { price: l[1], ts: lastLocal, source: "chainlink" } : null;
 }
-/** Chainlink price at/just before a unix-second timestamp (Polymarket strike fallback). */
+/** Chainlink SPOT price at/just before a unix-second timestamp. NOT the Polymarket Price to Beat: that is the Chainlink
+ *  TWAP-60s value at window start (see polymarket.ts resolveStrike); the spot tick differs by up to tens of dollars. */
 export const chainlinkAt = (sec: number) => series.at(sec * 1000, 10_000) ?? liveAt(sec);
 /** Mean of the last 60s of Chainlink data (or of [closeMs-60s, closeMs] when closeMs is given). */
 export const chainlinkAvg60 = (closeMs?: number) => closeMs ? series.mean(closeMs - 60_000, closeMs) : series.mean((series.last()?.[0] ?? 0) - 60_000, Infinity);

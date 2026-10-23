@@ -1,9 +1,8 @@
 import { config } from "./config.ts";
 import { getJson, realAsk } from "./http.ts";
-import { btcPrice, btcRestTs } from "./btc.ts";
-import { brtiAvg60, brtiSpot } from "./feeds/brti.ts";
-import { cfAvg60, cfSpot } from "./feeds/kalshiIndex.ts";
-import { fetchKalshiTop, kalshiTop, kalshiWatch } from "./feeds/kalshiBook.ts";
+import { cfAvg60, cfError, cfSettle, cfSpot } from "./feeds/kalshiIndex.ts";
+import { fetchKalshiTop, kalshiAuthError, kalshiTop, kalshiWatch } from "./feeds/kalshiBook.ts";
+import { kalshiWsUp } from "./feeds/kalshiWs.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
 
 let cached: any = null; // current-window market (static fields)
@@ -30,8 +29,9 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
   const source: "ws" | "rest" = top?.src ?? "rest"; // honest: cached REST polls report "rest"
   const yesBid = top?.yesBid ?? null, noBid = top?.noBid ?? null;
   const m = base;
-  // Real CF Benchmarks index (authenticated WS) when fresh, else the exchange-median proxy.
-  const cf = cfSpot(), sp = cf ?? brtiSpot(), fb = btcPrice();
+  // Official CF Benchmarks BRTI (authenticated Kalshi WS) ONLY. No fallback of any kind: otherwise spot is null with a reason.
+  const sp = cfSpot();
+  const spotError = sp ? null : kalshiAuthError() ?? cfError() ?? (kalshiWsUp() ? "no BRTI tick received in the last 3s" : "Kalshi WS not connected");
   return {
     venue: "kalshi",
     marketId: m.ticker,
@@ -44,8 +44,9 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
     upBid: yesBid,
     downBid: noBid,
     ts: Date.now(),
-    spot: sp?.price ?? fb, spotSource: sp ? sp.source : fb !== null ? "coinbase-rest" : null,
-    spotTs: sp ? sp.ts : fb !== null ? btcRestTs() : null, spotAvg60: (cf ? cfAvg60() : null) ?? brtiAvg60(),
+    spot: sp?.price ?? null, spotSource: sp ? "cfbenchmarks" : null, spotTs: sp?.ts ?? null,
+    spotAvg60: sp ? cfAvg60() : null, spotSettle: sp ? cfSettle() : null, spotError,
+    strikeSource: typeof m.floor_strike === "number" || Number(m.floor_strike) ? "kalshi floor_strike" : null,
     quoteSource: source, quoteAgeMs: top ? Date.now() - top.ts : null,
   };
 }

@@ -1,7 +1,6 @@
 import { config } from "./config.ts";
-import { btcPrice, pollBtc } from "./btc.ts";
-import { startBrti } from "./feeds/brti.ts";
-import { startChainlink, chainlinkSpot } from "./feeds/chainlink.ts";
+import { setAlert } from "./alerts.ts";
+import { startChainlink } from "./feeds/chainlink.ts";
 import { startKalshiBook } from "./feeds/kalshiBook.ts";
 import { feedStats, rate } from "./feeds/meter.ts";
 import { onChange } from "./feeds/notify.ts";
@@ -42,7 +41,7 @@ async function tick() {
       const now = Date.now();
       const [k, p] = await Promise.all([fetchKalshi(now).catch(() => null), fetchPolymarket(now).catch(() => null)]);
       tickRate.hit();
-      const btc = chainlinkSpot()?.price ?? btcPrice();
+      const btc = p?.spot ?? k?.spot ?? null; // Polymarket Chainlink/TWAP, else Kalshi BRTI, else null (never an exchange price)
       const { combos, taken } = onTick(k, p, btc, now);
       latest = buildState(now, btc, k, p, combos, { feeds: [], tickRate: { ticksPerSec: 0, broadcastsPerSec: 0 } });
       scheduleBroadcast();
@@ -68,13 +67,14 @@ function requestTick() {
 }
 onChange(requestTick);
 
-startChainlink(); startBrti();
+startChainlink();
 if (config.polyApiKey && config.polyApiSecret && config.polyApiPassphrase) {
   polyLiveStart({ url: config.polyLiveWsUrl, apiKey: config.polyApiKey, secret: config.polyApiSecret, passphrase: config.polyApiPassphrase });
   console.log("[sim] Polymarket live-data v2 (Chainlink TWAP) enabled");
+} else {
+  console.log("[sim] Polymarket live-data creds not set; using RTDS Chainlink spot");
+  setAlert("poly-creds", "Polymarket live-data creds not set — TWAP spot unavailable; using RTDS Chainlink spot");
 }
  startPolyBook(); startKalshiBook();
 setInterval(() => { lastTickAt = Date.now(); void tick(); }, config.tickHeartbeatMs); // 1s floor heartbeat
-setInterval(() => { pollBtc().catch(() => {}); }, 5000); // REST spot is only a fallback now
-pollBtc().catch(() => {});
 (async () => { for (;;) { try { await settleDue(Date.now()); } catch (e) { console.error("[settle loop]", e); } await Bun.sleep(1000); } })();

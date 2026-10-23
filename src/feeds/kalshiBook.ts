@@ -2,6 +2,7 @@
 // (quoteSource "ws"); REST polling of GET /markets/{ticker}/orderbook?depth=1 (p50 ~66ms) runs only while the WS is down / not
 // snapshotted / the quote is older than MAX_QUOTE_AGE_MS. Without keys it is REST only, and quotes honestly report "rest".
 // Up ask = 100 - best NO bid, Down ask = 100 - best YES bid.
+import { setAlert } from "../alerts.ts";
 import { config } from "../config.ts";
 import { getJson } from "../http.ts";
 import { loadPrivateKey } from "./kalshiAuth.ts";
@@ -43,16 +44,29 @@ function store(tk: string, r: KTop, meterName: "ws" | "rest") {
   }
 }
 
+let authError: string | null = null;
+/** Why the official Kalshi feed cannot even start (no key id / unreadable key), or null. */
+export const kalshiAuthError = () => authError;
+const noAuth = (why: string) => {
+  authError = why;
+  setAlert("kalshi-auth", `Kalshi official BRTI spot disabled: ${why}. Add KALSHI_API_KEY_ID and KALSHI_PRIVATE_KEY_PATH (or KALSHI_PRIVATE_KEY) to .env.`);
+  console.log(`[kalshiBook] ${why}; Kalshi spot will be null (no substitute price is used), quotes via REST`);
+  return false;
+};
+
 /** Try to enable the signed WS. Returns false (and logs once, never the key) when keys are missing/unreadable. */
 function tryStartWs(over?: Partial<KalshiWsOpts>): boolean {
+  authError = null;
   const keyId = over?.keyId ?? config.kalshiApiKeyId;
-  if (!keyId) return false;
+  console.log(`[kalshiBook] KALSHI_API_KEY_ID ${keyId ? "set" : "NOT set"}; key source: ${over?.privateKey ? "provided" : config.kalshiPrivateKey ? "inline PEM" : config.kalshiPrivateKeyPath ? `file ${config.kalshiPrivateKeyPath}` : "none"}`);
+  if (!keyId) return noAuth("KALSHI_API_KEY_ID not set");
   let key = over?.privateKey ?? null;
   if (!key) {
     try { key = loadPrivateKey({ pem: config.kalshiPrivateKey, path: config.kalshiPrivateKeyPath }); }
-    catch (e) { console.error(`[kalshiBook] cannot load Kalshi private key (${(e as Error).message.split("\n")[0]}); using REST`); return false; }
+    catch (e) { return noAuth(`cannot read/parse Kalshi private key (${(e as Error).message.split("\n")[0]})`); }
   }
-  if (!key) return false;
+  if (!key) return noAuth("no Kalshi private key (set KALSHI_PRIVATE_KEY_PATH or KALSHI_PRIVATE_KEY)");
+  console.log(`[kalshiBook] private key found and parsed; asymmetricKeyType=${key.asymmetricKeyType}`);
   kalshiWsStart({ url: config.kalshiWsUrl, ...over, keyId, privateKey: key, onTop: (tk, t) => store(tk, { ...t, ts: Date.now(), src: "ws" }, "ws") });
   return true;
 }

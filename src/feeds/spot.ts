@@ -1,4 +1,4 @@
-export interface SpotQuote { price: number; ts: number; source: "chainlink" | "chainlink-twap" | "cfbenchmarks" | "brti-proxy" }
+export interface SpotQuote { price: number; ts: number; source: "chainlink" | "chainlink-twap" | "cfbenchmarks" }
 
 /** Time-ordered ring buffer of (ts ms, value) with window means. */
 export class Series {

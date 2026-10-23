@@ -14,6 +14,8 @@ export interface WSOpts {
   /** Called on every close. Return "stop" to give up for good, or a number (ms) to override the next reconnect delay. */
   onClose?: (code: number, reason: string) => "stop" | number | void;
   maxBackoffMs?: number;     // default 10s
+  /** Called when the socket errors (e.g. failed upgrade). A close handler is NOT called afterwards for the same socket. */
+  onError?: () => void;
 }
 export interface WSHandle { send(s: string | object): void; close(): void; reconnect(): void }
 
@@ -40,7 +42,7 @@ export function connectWS(o: WSOpts): WSHandle {
     m.reconnects++;
     const delay = forcedDelay ?? Math.min(o.maxBackoffMs ?? 10_000, 500 * 2 ** attempt++);
     forcedDelay = null;
-    retry = setTimeout(open, delay);
+    retry = setTimeout(() => { retry = null; open(); }, delay);
   };
   function open() {
     if (closed) return;
@@ -67,7 +69,7 @@ export function connectWS(o: WSOpts): WSHandle {
       lastMsg = Date.now(); attempt = 0; m.hit();
       try { o.onMessage(typeof e.data === "string" ? e.data : String(e.data), handle); } catch (err) { console.error(`[${o.name}] onMessage`, err); }
     };
-    mine.onerror = () => die();
+    mine.onerror = () => { if (!dead && ws === mine) { try { o.onError?.(); } catch (err) { console.error(`[${o.name}] onError`, err); } } die(); };
     mine.onclose = (e: any) => {
       if (ws === mine && !dead && o.onClose) {
         try {

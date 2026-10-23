@@ -80,6 +80,8 @@ export function twapSpot(now = Date.now()): SpotQuote | null {
 export function twapAvg60(closeMs?: number): number | null {
   return closeMs ? twap.at(closeMs, 5000) : twap.last()?.[1] ?? null;
 }
+/** Chainlink TWAP-60s value at a unix-second timestamp (±2s) — Polymarket's Price to Beat when sec = window start. */
+export const twapAt = (sec: number) => twap.at(sec * 1000, 2000) ?? twap.firstAfter(sec * 1000, 2000);
 /** Spot-price history from price.crypto for the strike fallback (price at/just before a unix-second timestamp). */
 export const liveAt = (sec: number) => live.at(sec * 1000, 10_000);
 export const polyLiveAuthed = () => authed;
