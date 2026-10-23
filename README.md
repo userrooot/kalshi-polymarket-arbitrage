@@ -155,6 +155,7 @@ All settings come from `.env` (see `.env.example`).
 | `NO_TRADE_LAST_SEC` | `20` | No new trades in the last N seconds of a window |
 | `POLL_MS` | `1000` | Market and BTC polling interval in milliseconds |
 | `PORT` | `3000` | Dashboard HTTP and WebSocket port |
+| `HOST` | `127.0.0.1` | Dashboard bind address. Keep localhost; on a server, use an SSH tunnel |
 | `DB_PATH` | `data/sim.sqlite` | SQLite file for simulated trades |
 | `KALSHI_BASE_URL` | `https://api.elections.kalshi.com/trade-api/v2` | Kalshi API base URL |
 | `POLY_GAMMA_URL` | `https://gamma-api.polymarket.com` | Polymarket Gamma API URL |
@@ -187,6 +188,119 @@ All settings come from `.env` (see `.env.example`).
 | `KALSHI_DEMO_PRIVATE_KEY_PATH` | (unset) | Path to the PEM private key for the Kalshi demo key |
 | `KALSHI_DEMO_BASE_URL` | `https://external-api.demo.kalshi.co/trade-api/v2` | Kalshi demo API base URL |
 | `CALIBRATE_LIVE` | `0` | **Real money.** `1` enables the opt-in live round-trip probe, after a typed confirmation. See the calibration step above |
+
+## Deploy to the UK VPS (AWS eu-west-2)
+
+Runs the bot on an EC2 instance in London to measure latency to Polymarket and Kalshi from the UK. The deploy scripts run on your PC, and the SSH key never leaves it.
+
+### Prerequisites
+
+- An EC2 instance running **Ubuntu** in the **eu-west-2 (London)** region. Replace `<YOUR-EC2-HOST>` with your instance public DNS.
+- Security group: allow **SSH (TCP 22) from your IP only**. **Do not open port 3000.**
+- Your instance key, e.g. `bot-uk-key.pem`.
+- Your Kalshi private key, e.g. `kalshi_private_key.pem`, in the repo root (if you use Kalshi keys).
+- Windows 10 or later (built-in OpenSSH client), or WSL / Linux / macOS for the bash script.
+
+### Deploy
+
+From the repo root, in PowerShell:
+
+```powershell
+.\deploy\deploy.ps1 -Key "C:\path\to\bot-uk-key.pem" -KalshiPem ".\kalshi_private_key.pem"
+```
+
+From bash (WSL, Linux or macOS):
+
+```bash
+./deploy/deploy.sh --key /path/to/bot-uk-key.pem --kalshi-pem ./kalshi_private_key.pem
+```
+
+To preview the commands without running them, add `-DryRun` (PowerShell) or `--dry-run` (bash).
+
+The script does this:
+
+1. Fixes the key file permissions with `icacls`. Windows OpenSSH refuses keys that other users can read.
+2. Packs the working tree (without `.git`, `node_modules`, `data/`, `.env` and `*.pem`) and copies it to `~/btcarb` on the VPS.
+3. Copies your `.env` and the Kalshi PEM to the VPS separately, with mode 600.
+4. Runs `deploy/setup-vps.sh` on the VPS. It is safe to re-run. It:
+   - installs `chrony`, `curl`, `unzip` and `git`, and syncs the clock to the Amazon Time Sync Service (`169.254.169.123`);
+   - installs Bun if missing, then runs `bun install --frozen-lockfile`;
+   - sets `KALSHI_PRIVATE_KEY_PATH` in the VPS `.env`;
+   - runs `bun run probe`, which writes `data/latency.json`;
+   - installs and starts the `btcarb` systemd service.
+5. Prints the SSH tunnel command for the dashboard.
+
+### View the dashboard (SSH tunnel)
+
+The dashboard listens only on the VPS's localhost. Open a tunnel from your PC and keep the window open:
+
+```bash
+ssh -i /path/to/bot-uk-key.pem -L 3000:localhost:3000 ubuntu@<YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com
+```
+
+Then open http://localhost:3000 in your browser.
+
+### Manage the service
+
+Run these on the VPS (after `ssh -i <key> ubuntu@<host>`):
+
+```bash
+sudo systemctl status btcarb
+sudo systemctl restart btcarb
+sudo systemctl stop btcarb
+sudo systemctl start btcarb
+journalctl -u btcarb -f
+```
+
+### Update
+
+Run the deploy command again. It replaces the code and keeps `data/`. Your local `.env` is copied to the VPS on every deploy, so change settings in your local `.env`.
+
+### Probe, replay and pull data back
+
+On the VPS:
+
+```bash
+cd ~/btcarb
+bun run probe                                  # measures round-trip times, writes data/latency.json
+bun run replay --lat-k 5..300 --lat-p 5..50    # replays recorded data, writes a CSV
+```
+
+Replay needs recorded data. Set `RECORD_MD=1` in the VPS `.env`, restart the service, and let it run for days.
+
+On your PC, from the repo root:
+
+```bash
+mkdir -p data
+scp -i /path/to/bot-uk-key.pem ubuntu@<YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com:~/btcarb/data/latency.json ./data/
+scp -r -i /path/to/bot-uk-key.pem ubuntu@<YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com:~/btcarb/data/md ./data/
+```
+
+### Clock sync
+
+Latency numbers are only meaningful with a tight clock. On the VPS, run:
+
+```bash
+chronyc tracking
+```
+
+The offset (`System time` line) should be about 1 ms or less. `chronyc sources` should list `169.254.169.123`.
+
+### Troubleshooting
+
+- **Permission denied, or "UNPROTECTED PRIVATE KEY FILE"**: Windows OpenSSH refuses a key that other users can read. Re-run the deploy script, or fix it by hand in PowerShell:
+  ```powershell
+  icacls "C:\path\to\bot-uk-key.pem" /inheritance:r /grant:r "$($env:USERNAME):R"
+  ```
+- **Host key prompt** (`Are you sure you want to continue connecting`): this is the first connection to the server. Answer `yes` only if you expect this instance. If the warning says the host key changed after a rebuild, run `ssh-keygen -R <YOUR-EC2-HOST>.eu-west-2.compute.amazonaws.com` and deploy again.
+- **Port 3000 already in use on your PC**: tunnel to another port, `-L 3001:localhost:3000`, and open http://localhost:3001. **On the VPS**, if `btcarb` fails with "address in use", run `sudo ss -ltnp | grep 3000` and stop the other process.
+- **Kalshi 401 or failed authentication**: the red alert banner on the dashboard names the problem (see [Reading the dashboard](#reading-the-dashboard)). Check `KALSHI_API_KEY_ID` in your local `.env` and that the PEM matches that key. Fix them on your PC, then deploy again.
+
+> **Important notes**
+> - **Simulation only.** The bot sends no orders and uses no real money.
+> - Before any real-money use, check each venue's terms and whether you may trade from the UK. Access rules differ by venue and can change.
+> - **Never commit `.env` or any `*.pem` file.** Both are in `.gitignore`. Do not paste them into chats or issues.
+> - **The dashboard has no authentication.** Keep it on `127.0.0.1` and reach it only through the SSH tunnel. Never open port 3000 in the security group.
 
 ## Disclaimer
 
