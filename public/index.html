@@ -104,6 +104,47 @@ main { padding: 16px; display: grid; gap: 16px; max-width: 1400px; margin: 0 aut
 .quote tbody th { text-align: left; font-family: inherit; font-weight: 600; }
 .quote td { font-size: 16px; }
 
+/* ---------- live spot ---------- */
+.spot {
+  background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 14px; transition: filter .3s, opacity .3s;
+}
+.spot.stale { filter: grayscale(1); opacity: .5; }
+.spot-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.spot-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.spot-flags { display: flex; gap: 6px; }
+.spot-price {
+  font-family: var(--mono); font-size: 30px; font-weight: 700; line-height: 1.15;
+  margin: 6px 0 2px; font-variant-numeric: tabular-nums; border-radius: 6px; white-space: nowrap;
+}
+.spot-price.flash-up { animation: flashUp .8s ease-out; }
+.spot-price.flash-down { animation: flashDown .8s ease-out; }
+@keyframes flashUp { 0% { background: rgba(34, 197, 94, .35); color: #fff; } 100% { background: transparent; color: var(--green); } }
+@keyframes flashDown { 0% { background: rgba(239, 68, 68, .35); color: #fff; } 100% { background: transparent; color: var(--red); } }
+.spot-src { font-size: 12px; overflow-wrap: anywhere; }
+.spot-sub { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+.spot-sub b { font-family: var(--mono); font-size: 15px; overflow-wrap: anywhere; }
+.spot-lean { display: block; font-family: inherit; font-size: 11px; font-weight: 400; color: var(--muted); }
+.spot-note { font-size: 11px; color: var(--muted); margin-top: 10px; }
+.spot-age { font-size: 11px; margin-top: 4px; }
+.badge.fb { background: var(--amber); color: #111; }
+.badge.stale-b { background: #2a3550; color: var(--amber); }
+.fresh { font-size: 12px; color: var(--muted); margin-top: 10px; font-family: var(--mono); }
+.fresh b { color: var(--text); font-weight: 600; }
+
+/* ---------- feeds strip ---------- */
+.feeds {
+  display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+  padding: 10px 14px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  font-size: 12px;
+}
+.feed-list { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; }
+.feed { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.feed .dot { width: 8px; height: 8px; }
+.feed b { font-weight: 600; }
+.feeds .rates { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px 18px; font-family: var(--mono); color: var(--muted); }
+.feeds .rates b { color: var(--text); font-weight: 600; }
+
 /* ---------- arbitrage ---------- */
 .combos { display: grid; gap: 12px; grid-template-columns: 1fr; }
 .combo {
@@ -178,6 +219,8 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
   .hstats { gap: 10px 18px; }
   .kv { grid-template-columns: 1fr 1fr; }
   .quote td { font-size: 14px; }
+  .spot-price { font-size: 24px; }
+  .feeds .rates { margin-left: 0; }
 }
 </style>
 </head>
@@ -199,6 +242,14 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
 
 <main>
 
+  <section class="feeds" id="feeds" aria-label="Feed status">
+    <div class="feed-list" id="feed-list"><span class="muted">Waiting for feed status...</span></div>
+    <div class="rates">
+      <span><b id="rate-ticks">—</b> ticks/s</span>
+      <span><b id="rate-bcast">—</b> broadcasts/s</span>
+    </div>
+  </section>
+
   <section class="stats" aria-label="Statistics">
     <div class="card big"><label>Total PnL</label><b id="s-pnl">—</b></div>
     <div class="card"><label>Win rate</label><b id="s-win">—</b></div>
@@ -214,6 +265,23 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
         <span class="muted mono" id="k-market">—</span>
       </div>
       <div class="venue-title" id="k-title">Waiting for market data...</div>
+      <div class="spot" id="k-spot">
+        <div class="spot-top">
+          <span class="spot-label">Live BTC spot</span>
+          <span class="spot-flags">
+            <span class="badge fb" id="k-spot-fb" hidden>fallback</span>
+            <span class="badge stale-b" id="k-spot-stale" hidden>stale</span>
+          </span>
+        </div>
+        <div class="spot-price" id="k-spot-price">—</div>
+        <div class="spot-src muted" id="k-spot-src" title="BRTI is licensed, so this is an approximation of the index">≈ BRTI proxy (median of 6 exchanges)</div>
+        <div class="spot-sub">
+          <div><label>60s avg (settlement estimate)</label><b id="k-spot-avg">—</b></div>
+          <div><label>Spot − strike</label><b id="k-spot-diff">—</b></div>
+        </div>
+        <p class="spot-note">BRTI itself is licensed and has no free live feed. This is a median of exchange mids, so expect about ±$3 versus the index.</p>
+        <div class="spot-age muted" id="k-spot-age">—</div>
+      </div>
       <div class="kv">
         <div><label>Strike (price to beat)</label><b id="k-strike">—</b></div>
         <div><label>Time left</label><b id="k-left">—</b></div>
@@ -225,6 +293,7 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
           <tr><th>Down</th><td id="k-downAsk">—</td><td id="k-downBid">—</td></tr>
         </tbody>
       </table>
+      <div class="fresh">Quotes <b id="k-qsrc">—</b> · age <span id="k-qage">—</span></div>
     </article>
 
     <article class="panel venue" id="panel-p">
@@ -233,6 +302,23 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
         <span class="muted mono" id="p-market">—</span>
       </div>
       <div class="venue-title" id="p-title">Waiting for market data...</div>
+      <div class="spot" id="p-spot">
+        <div class="spot-top">
+          <span class="spot-label">Live BTC spot</span>
+          <span class="spot-flags">
+            <span class="badge fb" id="p-spot-fb" hidden>fallback</span>
+            <span class="badge stale-b" id="p-spot-stale" hidden>stale</span>
+          </span>
+        </div>
+        <div class="spot-price" id="p-spot-price">—</div>
+        <div class="spot-src muted" id="p-spot-src">Chainlink BTC/USD</div>
+        <div class="spot-sub">
+          <div><label>60s avg (settlement estimate)</label><b id="p-spot-avg">—</b></div>
+          <div><label>Spot − strike</label><b id="p-spot-diff">—</b></div>
+        </div>
+        <p class="spot-note">Streamed via Polymarket RTDS.</p>
+        <div class="spot-age muted" id="p-spot-age">—</div>
+      </div>
       <div class="kv">
         <div><label>Strike (price to beat)</label><b id="p-strike">—</b></div>
         <div><label>Time left</label><b id="p-left">—</b></div>
@@ -244,6 +330,7 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
           <tr><th>Down</th><td id="p-downAsk">—</td><td id="p-downBid">—</td></tr>
         </tbody>
       </table>
+      <div class="fresh">Quotes <b id="p-qsrc">—</b> · age <span id="p-qage">—</span></div>
     </article>
   </section>
 
@@ -412,6 +499,8 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
   const expanded = new Set();   // expanded trade ids
   let lastTradesSig = "";
   let eventSig = "";
+  let renderedAt = 0;           // Date.now() when the latest state was rendered
+  const lastSpot = { k: null, p: null };
 
   // ---------- connection ----------
   function setConn(state) {
@@ -470,9 +559,11 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     // ignore a stale GET /api/state that arrives after a newer WS message
     if (S && isNum(s.now) && isNum(S.now) && s.now < S.now) return;
     S = s;
+    renderedAt = Date.now();
     renderHeader();
     renderVenue("k", S.kalshi);
     renderVenue("p", S.polymarket);
+    renderFeeds();
     renderCombos();
     renderStats();
     renderCharts();
@@ -504,11 +595,114 @@ td.empty { text-align: center; color: var(--muted); padding: 20px; }
     setText(`${p}-downAsk`, fmtCents(v?.downAsk));
     setText(`${p}-downBid`, fmtCents(v?.downBid));
     $(`panel-${p}`).classList.toggle("offline", !v);
+    renderSpot(p, v);
+    setText(`${p}-qsrc`, quoteSrcTxt(v?.quoteSource));
+  }
+
+  // ---------- live BTC spot, quote freshness, feeds ----------
+  const SPOT_SRC = {
+    chainlink: "Chainlink BTC/USD",
+    "brti-proxy": "≈ BRTI proxy (median of 6 exchanges)",
+    "coinbase-rest": "Coinbase REST",
+  };
+  const SPOT_DEFAULT = { k: "brti-proxy", p: "chainlink" };
+  const STALE_MS = 5000;
+
+  const fmtAge = (ms) => (isNum(ms)
+    ? (ms < 1000 ? `${Math.round(ms)} ms` : `${(ms / 1000).toFixed(1)} s`)
+    : DASH);
+  // age of a backend timestamp as of `now`; uses the backend clock (S.now) when present
+  const ageAt = (ts, now) => {
+    if (!isNum(ts)) return null;
+    return isNum(S?.now) ? (S.now - ts) + (now - renderedAt) : now - ts;
+  };
+  const fmtSignedUsd = (v) => {
+    const r = Math.round(v * 100) / 100;
+    const abs = Math.abs(r).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (r > 0 ? "+$" : r < 0 ? "-$" : "$") + abs;
+  };
+  const quoteSrcTxt = (q) => (q === "ws" ? "WS push" : q === "rest" ? "REST" : DASH);
+  const flash = (el, cls) => {
+    el.classList.remove("flash-up", "flash-down");
+    void el.offsetWidth; // restart the CSS animation
+    el.classList.add(cls);
+  };
+
+  function renderSpot(p, v) {
+    const price = isNum(v?.spot) ? v.spot : null;
+    setText(`${p}-spot-price`, fmtUsd(price));
+    if (price != null && lastSpot[p] != null && price !== lastSpot[p]) {
+      flash($(`${p}-spot-price`), price > lastSpot[p] ? "flash-up" : "flash-down");
+    }
+    lastSpot[p] = price;
+
+    const srcKey = v?.spotSource ?? SPOT_DEFAULT[p];
+    setText(`${p}-spot-src`, SPOT_SRC[srcKey] ?? String(srcKey));
+    $(`${p}-spot-fb`).hidden = srcKey !== "coinbase-rest";
+    setText(`${p}-spot-avg`, fmtUsd(v?.spotAvg60));
+
+    const strike = isNum(v?.strike) ? v.strike : null;
+    const dEl = $(`${p}-spot-diff`);
+    if (price == null || strike == null) {
+      setText(`${p}-spot-diff`, DASH);
+      dEl.className = "";
+    } else {
+      const diff = price - strike;
+      const lean = diff > 0 ? "above strike · Up leaning"
+        : diff < 0 ? "below strike · Down leaning" : "at strike";
+      dEl.innerHTML = `${fmtSignedUsd(diff)}<span class="spot-lean">${lean}</span>`;
+      dEl.className = signCls(diff);
+    }
+  }
+
+  // runs every tick so staleness and ages advance even without new messages
+  function updateLive(now) {
+    for (const p of ["k", "p"]) {
+      const v = S ? (p === "k" ? S.kalshi : S.polymarket) : null;
+      const age = ageAt(v?.spotTs, now);
+      const stale = isNum(age) && age > STALE_MS;
+      $(`${p}-spot`).classList.toggle("stale", stale);
+      $(`${p}-spot-stale`).hidden = !stale;
+      setText(`${p}-spot-age`, isNum(age) ? `spot updated ${fmtAge(age)} ago` : DASH);
+      const qAge = isNum(v?.quoteAgeMs) ? v.quoteAgeMs + (now - renderedAt) : null;
+      setText(`${p}-qage`, fmtAge(qAge));
+    }
+    for (const el of document.querySelectorAll(".feed-age")) {
+      if (el.dataset.base === "") continue;
+      el.textContent = fmtAge(Number(el.dataset.base) + (now - renderedAt));
+    }
+  }
+
+  function renderFeeds() {
+    const rate = S?.tickRate;
+    setText("rate-ticks", isNum(rate?.ticksPerSec) ? rate.ticksPerSec.toFixed(1) : DASH);
+    setText("rate-bcast", isNum(rate?.broadcastsPerSec) ? rate.broadcastsPerSec.toFixed(1) : DASH);
+    const box = $("feed-list");
+    if (!Array.isArray(S?.feeds)) {
+      box.innerHTML = `<span class="muted">No feed status from this backend version</span>`;
+      return;
+    }
+    if (!S.feeds.length) {
+      box.innerHTML = `<span class="muted">No feeds reported</span>`;
+      return;
+    }
+    box.innerHTML = S.feeds.map((f) => {
+      const base = isNum(f.lastMsgAgeMs) ? f.lastMsgAgeMs : "";
+      const rec = isNum(f.reconnects) && f.reconnects > 0
+        ? ` <span class="warn">↻${f.reconnects}</span>` : "";
+      return `<span class="feed" title="${esc(f.connected ? "connected" : "disconnected")}">
+        <span class="dot ${f.connected ? "live" : "offline"}"></span>
+        <b>${esc(f.name)}</b>
+        <span class="mono muted">${isNum(f.msgsPerSec) ? f.msgsPerSec.toFixed(1) : DASH} msg/s</span>
+        <span class="muted">last <span class="mono feed-age" data-base="${base}">${base === "" ? DASH : fmtAge(base)}</span></span>${rec}
+      </span>`;
+    }).join("");
   }
 
   function tick() {
     const now = Date.now();
     if (conn === "live" && now - lastMsgAt > 5000) setConn("stale");
+    updateLive(now);
 
     const c = closeMs();
     const left = c == null ? null : c - now;
