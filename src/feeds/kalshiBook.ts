@@ -9,18 +9,27 @@ import { loadPrivateKey } from "./kalshiAuth.ts";
 import { kalshiWsReady, kalshiWsStart, kalshiWsWatch, type KalshiWsOpts } from "./kalshiWs.ts";
 import { meter } from "./meter.ts";
 import { bump } from "./notify.ts";
+import { publishKalshi } from "../exec/hub.ts";
 
-export interface KTop { yesBid: number | null; noBid: number | null; ts: number; src: "ws" | "rest" }
+export interface KTop { yesBid: number | null; noBid: number | null; ts: number; src: "ws" | "rest"; yesSz?: number; noSz?: number }
 const tops = new Map<string, KTop>();
 let ticker: string | null = null;
 let backoffUntil = 0, backoffMs = 1000;
 let wsOn = false;
 const rm = () => meter("kalshiBook(rest)"); // created lazily so it does not show as an idle feed when the WS is primary
 
-const best = (lv: unknown) => {
-  const px = (Array.isArray(lv) ? lv : []).filter((l: any) => Number(l?.[1]) > 0).map((l: any) => Number(l[0]) * 100).filter(Number.isFinite);
-  const v = px.length ? Math.round(Math.max(...px) * 100) / 100 : null;
-  return v !== null && v > 0 ? v : null;
+const bestLvl = (lv: unknown): { price: number; size: number } | null => {
+  let b: { price: number; size: number } | null = null;
+  for (const l of Array.isArray(lv) ? lv : []) {
+    const p = Number((l as any)?.[0]) * 100, sz = Number((l as any)?.[1]);
+    if (Number.isFinite(p) && sz > 0 && p > 0 && (!b || p > b.price)) b = { price: Math.round(p * 100) / 100, size: sz };
+  }
+  return b;
+};
+const best = (lv: unknown) => bestLvl(lv)?.price ?? null;
+const restTop = (ob: any): KTop => {
+  const y = bestLvl(ob.yes_dollars ?? ob.yes), n = bestLvl(ob.no_dollars ?? ob.no);
+  return { yesBid: y?.price ?? null, noBid: n?.price ?? null, ts: Date.now(), src: "rest", yesSz: y?.size, noSz: n?.size };
 };
 
 /** One-shot orderbook fetch (also used as REST fallback). */
@@ -28,7 +37,7 @@ export async function fetchKalshiTop(tk: string): Promise<KTop | null> {
   const j = await getJson(`${config.kalshiBase}/markets/${tk}/orderbook?depth=1`, 3000);
   const ob = j?.orderbook_fp ?? j?.orderbook ?? null;
   if (!ob) return null;
-  return { yesBid: best(ob.yes_dollars ?? ob.yes), noBid: best(ob.no_dollars ?? ob.no), ts: Date.now(), src: "rest" };
+  return restTop(ob);
 }
 
 export const kalshiWatch = (tk: string) => { ticker = tk; if (wsOn) kalshiWsWatch(tk); };
@@ -37,6 +46,8 @@ export const kalshiWsEnabled = () => wsOn;
 
 function store(tk: string, r: KTop, meterName: "ws" | "rest") {
   const prev = tops.get(tk);
+  if (r.src === "rest") // COARSE depth: only the best level of each side (REST ?depth=1); WS depth is published from kalshiWs.ts
+    publishKalshi(tk, r.yesBid !== null ? [{ price: r.yesBid, size: r.yesSz ?? 1 }] : [], r.noBid !== null ? [{ price: r.noBid, size: r.noSz ?? 1 }] : [], null, "rest-coarse");
   tops.set(tk, r);
   if (!prev || prev.yesBid !== r.yesBid || prev.noBid !== r.noBid) {
     meter(meterName === "ws" ? "kalshiBook(ws)" : "kalshiBook(rest)").change();
@@ -104,6 +115,6 @@ async function fetchKalshiRaw(tk: string): Promise<KTop | 429 | null> {
     if (!r.ok) return null;
     const j: any = await r.json();
     const ob = j?.orderbook_fp ?? j?.orderbook;
-    return ob ? { yesBid: best(ob.yes_dollars ?? ob.yes), noBid: best(ob.no_dollars ?? ob.no), ts: Date.now(), src: "rest" } : null;
+    return ob ? restTop(ob) : null;
   } catch { return null; }
 }

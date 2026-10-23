@@ -2,6 +2,7 @@ import { getAlerts } from "./alerts.ts";
 import { config } from "./config.ts";
 import { computeCombos } from "./arbitrage.ts";
 import { allTrades, insertTrade, loadEvents, saveEvent, updateTrade } from "./db.ts";
+import { execOnSettle, execOnTrade, execState } from "./exec/index.ts";
 import { fetchKalshiResult } from "./kalshi.ts";
 import { fetchPolyResult } from "./polymarket.ts";
 import type { Combo, CostPoint, DashboardState, PnlPoint, Side, Stats, Trade, VenueSnapshot } from "./types.ts";
@@ -59,6 +60,7 @@ export function onTick(k: VenueSnapshot | null, p: VenueSnapshot | null, btc: nu
       status: "OPEN",
     });
     trades.push(t); taken.push(t);
+    execOnTrade(t, combo, k, p, now); // realistic-execution sim (async; may later adjust this trade per EXEC_PRIMARY)
     lastTradeAt.set(eventKey, now);
   }
   return { combos, taken };
@@ -90,15 +92,20 @@ async function settleEvent(eventKey: string, open: Trade[], now: number) {
   const extra = `Kalshi expiration value: ${px(k.expirationValue)}${p.finalPrice ? `; Polymarket final price: ${px(p.finalPrice)}` : ""}.`;
   for (const t of open) {
     const kWon = t.kalshiSide === k.result, pWon = t.polySide === p.result;
-    const payout = ((kWon ? 1 : 0) + (pWon ? 1 : 0)) * t.contracts;
+    // EXEC_PRIMARY != NAIVE: only the legs that the execution sim filled (and kept) settle; unwound legs already booked their PnL
+    const hasLegs = t.kalshiQty !== undefined && t.polyQty !== undefined;
+    const payout = hasLegs ? (kWon ? t.kalshiQty! : 0) + (pWon ? t.polyQty! : 0) : ((kWon ? 1 : 0) + (pWon ? 1 : 0)) * t.contracts;
     Object.assign(t, {
       status: "SETTLED", settledAt: now, kalshiResult: k.result, polyResult: p.result,
       kalshiLegWon: kWon, polyLegWon: pWon, payoutUsd: payout,
-      pnlUsd: Math.round((payout - t.stakeUsd) * 100) / 100,
+      pnlUsd: Math.round((payout - t.stakeUsd + (t.realizedUsd ?? 0)) * 100) / 100,
       btcAtSettle: k.expirationValue ?? p.finalPrice,
       kalshiStrike: t.kalshiStrike ?? k.strike, polyStrike: t.polyStrike ?? p.strike,
     } satisfies Partial<Trade>);
-    t.outcomeReason = explain(t, k.result, p.result, kWon, pWon, payout, t.pnlUsd!, extra);
+    t.outcomeReason = hasLegs
+      ? `Execution sim (${t.execStrategy}): held Kalshi ${t.kalshiQty} + Polymarket ${t.polyQty}. Kalshi resolved ${k.result} (${kWon ? "WON" : "LOST"}), Polymarket resolved ${p.result} (${pWon ? "WON" : "LOST"}). Payout ${usd(payout)} vs stake ${usd(t.stakeUsd)}${t.realizedUsd ? ` + realised unwind ${usdSigned(t.realizedUsd)}` : ""} => P&L ${usdSigned(t.pnlUsd!)}. ` + extra
+      : explain(t, k.result, p.result, kWon, pWon, payout, t.pnlUsd!, extra);
+    execOnSettle(t, kWon, pWon);
     updateTrade(t);
     console.log(`[settle] #${t.id} ${t.combo} K=${k.result} P=${p.result} pnl ${usdSigned(t.pnlUsd!)}`);
   }
@@ -141,6 +148,6 @@ export function buildState(now: number, btc: number | null, k: VenueSnapshot | n
     now, maxTotalCost: config.maxTotalCost, maxTradesPerEvent: config.maxTradesPerEvent, contractsPerTrade: config.contractsPerTrade,
     btcPrice: btc, alerts: getAlerts(), ...extra, kalshi: k, polymarket: p, combos, eventKey,
     tradesThisEvent: eventKey ? eventTrades(eventKey).length : 0,
-    stats: stats(), costHistory, pnlHistory: pnlHistory(), recentTrades: recentTrades(100),
+    exec: execState(), stats: stats(), costHistory, pnlHistory: pnlHistory(), recentTrades: recentTrades(100),
   };
 }

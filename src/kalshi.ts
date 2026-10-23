@@ -3,6 +3,7 @@ import { getJson, realAsk } from "./http.ts";
 import { cfAvg60, cfError, cfSettle, cfSpot } from "./feeds/kalshiIndex.ts";
 import { fetchKalshiTop, kalshiAuthError, kalshiTop, kalshiWatch } from "./feeds/kalshiBook.ts";
 import { kalshiWsUp } from "./feeds/kalshiWs.ts";
+import { setKalshiMeta } from "./exec/hub.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
 
 let cached: any = null; // current-window market (static fields)
@@ -21,6 +22,7 @@ export async function fetchKalshi(now = Date.now()): Promise<VenueSnapshot | nul
   // Quotes come from the polled orderbook cache (Kalshi books hold BIDS only: YES ask = 100 - best NO bid,
   // NO ask = 100 - best YES bid). The listing endpoint lags by seconds so it is never used. REST fallback only if the cache is stale.
   kalshiWatch(base.ticker);
+  setKalshiMeta(base.ticker, { closeMs: Date.parse(base.close_time) || undefined, priceRanges: base.price_ranges }); // tick grid + window end for the exec layer
   let top = kalshiTop(base.ticker);
   if (!top || Date.now() - top.ts > config.maxQuoteAgeMs) {
     const r = await fetchKalshiTop(base.ticker);

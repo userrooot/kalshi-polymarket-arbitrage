@@ -6,7 +6,10 @@
   "scripts": {
     "start": "bun run src/index.ts",
     "dev": "bun --watch run src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "probe": "bun run src/exec/probe.ts",
+    "replay": "bun run src/exec/replay.ts",
+    "record": "RECORD_MD=1 bun run src/index.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",

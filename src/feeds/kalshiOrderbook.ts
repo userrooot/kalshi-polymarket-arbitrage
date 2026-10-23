@@ -52,6 +52,12 @@ export class KalshiBook {
     const noBid = nb === null ? null : Math.round(nb * 100) / 100;
     return { yesBid: yesBid !== null && yesBid > 0 ? yesBid : null, noBid: noBid !== null && noBid > 0 ? noBid : null };
   }
+  /** Full bid ladders, each DESCENDING and in its own price terms (NO levels converted off the YES scale when noOnYesScale). */
+  levels(): { yesBids: { price: number; size: number }[]; noBids: { price: number; size: number }[] } {
+    const mk = (m: Map<number, number>, conv: (p: number) => number) =>
+      [...m].map(([p, size]) => ({ price: Math.round(conv(p) * 100) / 100, size })).filter((l) => l.price > 0 && l.size > 0).sort((a, b) => b.price - a.price);
+    return { yesBids: mk(this.yes, (p) => p), noBids: mk(this.no, (p) => (this.noOnYesScale ? 100 - p : p)) };
+  }
   /** Equivalent asks: Up(YES) ask = 100 - best NO bid; Down(NO) ask = 100 - best YES bid. */
   asks() { const t = this.top(); return { upAsk: t.noBid === null ? null : 100 - t.noBid, downAsk: t.yesBid === null ? null : 100 - t.yesBid }; }
 }

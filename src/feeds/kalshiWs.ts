@@ -6,6 +6,7 @@ import { KalshiBook, SeqTracker } from "./kalshiOrderbook.ts";
 import { clearAlert, setAlert } from "../alerts.ts";
 import { cfConnected, cfMarkUnavailable, cfOnMessage, cfSetError } from "./kalshiIndex.ts";
 import { meter } from "./meter.ts";
+import { publishKalshi } from "../exec/hub.ts";
 import { connectWS, type WSHandle } from "./ws.ts";
 
 export interface KalshiWsOpts {
@@ -143,7 +144,12 @@ export async function diagnoseHandshake(force = false): Promise<string | null> {
   return msg;
 }
 
-function publish(tk: string, b: KalshiBook) { o?.onTop(tk, b.top()); }
+function publish(tk: string, b: KalshiBook, venueTs: number | null = null) {
+  o?.onTop(tk, b.top());
+  const l = b.levels();
+  publishKalshi(tk, l.yesBids, l.noBids, venueTs, "ws"); // full L2 -> exec history / episodes
+}
+const tsOf = (j: any): number | null => { const x = Number(j?.msg?.ts_ms) || Number(j?.sending_ts_ms); return x > 1e12 ? x : null; };
 
 function onMsg(j: any) {
   const t = j?.type;
@@ -159,7 +165,7 @@ function onMsg(j: any) {
       let b = books.get(tk);
       if (!b) books.set(tk, (b = new KalshiBook(o?.useYesPrice ?? true)));
       b.snapshot(j.msg); snapAttempts = 0;
-      publish(tk, b);
+      publish(tk, b, tsOf(j));
       return;
     }
     const r = seq.check(sid, sq);
@@ -168,7 +174,7 @@ function onMsg(j: any) {
     const b = books.get(tk);
     if (!b || !b.snapshotted) return;
     b.delta(j.msg);
-    publish(tk, b);
+    publish(tk, b, tsOf(j));
   } else if (t === "cfbenchmarks_value_5hz" || t === "cfbenchmarks_value") {
     cfOnMessage(j, o?.indexId ?? "BRTI");
   } else if (t === "subscribed") {

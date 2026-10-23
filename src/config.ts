@@ -32,4 +32,19 @@ export const config = {
   polyApiSecret: process.env.POLY_API_SECRET || undefined,
   polyApiPassphrase: process.env.POLY_API_PASSPHRASE || undefined,
   polyLiveWsUrl: str("POLY_LIVE_WS_URL", "wss://ws-live-v2.polymarket.com/ws"),
+  // --- realistic execution simulation (src/exec/*) ---
+  execSim: num("EXEC_SIM", 1) !== 0,
+  slippageTicks: num("SLIPPAGE_TICKS", 1),          // limit price = seen ask + N ticks
+  raceWindowMs: num("RACE_WINDOW_MS", 2),           // levels that change within this window after arrival count as taken
+  pLoseRace: num("P_LOSE_RACE", 0.3),               // extra chance to lose the best level when the opportunity died <=20ms after arrival (a guess)
+  unwindMode: (str("UNWIND_MODE", "bid") === "hold" ? "hold" : "bid") as "bid" | "hold",
+  unwindAfterMs: num("UNWIND_AFTER_MS", 500),
+  feesOn: num("FEES_ON", 0) !== 0,                  // taker fees (formulas UNVERIFIED)
+  bookHistoryMin: num("BOOK_HISTORY_MIN", 20),
+  latProfile: str("LAT_PROFILE", "data/latency.json"),
+  latKalshiMs: process.env.LAT_KALSHI_MS ? num("LAT_KALSHI_MS", NaN) : undefined, // what-if Kalshi round trip
+  latPolyMs: process.env.LAT_POLY_MS ? num("LAT_POLY_MS", NaN) : undefined,       // what-if Polymarket round trip
+  execPrimary: (["NAIVE", "PAR", "K_THEN_P", "P_THEN_K"].includes(str("EXEC_PRIMARY", "NAIVE")) ? str("EXEC_PRIMARY", "NAIVE") : "NAIVE") as "NAIVE" | "PAR" | "K_THEN_P" | "P_THEN_K",
+  execSeed: process.env.EXEC_SEED ? num("EXEC_SEED", NaN) : undefined,
+  episodeStaleMs: num("EPISODE_STALE_MS", 3000),
 };

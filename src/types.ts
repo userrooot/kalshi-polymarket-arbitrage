@@ -75,6 +75,18 @@ export interface Trade {
   // human readable explanation of why profit/loss happened
   outcomeReason?: string;
   btcAtSettle?: number | null;
+  // --- realistic execution (only set when EXEC_PRIMARY != NAIVE and the sim ran; absent = both legs filled in full at kalshiPrice/polyPrice) ---
+  execStrategy?: string;           // strategy whose fills this trade's headline PnL uses
+  kalshiQty?: number;              // contracts of the Kalshi leg held to settlement
+  polyQty?: number;                // shares of the Polymarket leg held to settlement
+  realizedUsd?: number;            // PnL already realised by unwinding an unhedged leg (added at settlement)
+  feesUsd?: number;
+  exec?: ExecTradeSummary;
+}
+/** Compact per-trade summary of the four simulated strategies (same decision, same latency samples). */
+export interface ExecTradeSummary {
+  decidedAt: number;
+  attempts: { strategy: string; outcome: "BOTH" | "ONE" | "NONE"; hedgedQty: number; kalshiStatus: string; polyStatus: string; timeToBothMs: number | null; expPnlUsd: number; unwound: boolean }[];
 }
 
 export interface Stats {

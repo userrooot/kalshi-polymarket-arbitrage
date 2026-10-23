@@ -6,6 +6,7 @@ import { feedStats, rate } from "./feeds/meter.ts";
 import { onChange } from "./feeds/notify.ts";
 import { polyLiveStart } from "./feeds/polyLive.ts";
 import { startPolyBook } from "./feeds/polyBook.ts";
+import { startExec } from "./exec/index.ts";
 import { fetchKalshi } from "./kalshi.ts";
 import { fetchPolymarket } from "./polymarket.ts";
 import { broadcast, server } from "./server.ts";
@@ -75,6 +76,7 @@ if (config.polyApiKey && config.polyApiSecret && config.polyApiPassphrase) {
   console.log("[sim] Polymarket live-data creds not set; using RTDS Chainlink spot");
   setAlert("poly-creds", "Polymarket live-data creds not set — TWAP spot unavailable; using RTDS Chainlink spot");
 }
+startExec();
  startPolyBook(); startKalshiBook();
 setInterval(() => { lastTickAt = Date.now(); void tick(); }, config.tickHeartbeatMs); // 1s floor heartbeat
 (async () => { for (;;) { try { await settleDue(Date.now()); } catch (e) { console.error("[settle loop]", e); } await Bun.sleep(1000); } })();

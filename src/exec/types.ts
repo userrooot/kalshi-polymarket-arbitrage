@@ -7,7 +7,11 @@ export interface Level { price: number; size: number }
 /** Full ask/bid depth for BUYING each side on one venue (asks ascending, bids descending). */
 export interface SideBook { asks: Level[]; bids: Level[] }
 /** Depth for one venue's current market: Up and Down are separate books (Kalshi: derived from YES/NO bids). */
-export interface VenueDepth { up: SideBook; down: SideBook; tick: (price: number) => number /* grid step at that price */; minSize: number }
+export interface VenueDepth { up: SideBook; down: SideBook; tick: (price: number) => number /* grid step at that price */; minSize: number;
+  /** ADDED: "ws" = full L2 from a websocket, "rest-coarse" = top-1 from a REST poll (lifetimes biased long). Default "ws". */
+  quality?: "ws" | "rest-coarse";
+  /** ADDED: Polymarket per-market matching delay (ms) if any. */
+  secondsDelayMs?: number }
 
 export interface DepthEvent {
   venue: Venue;
@@ -15,6 +19,8 @@ export interface DepthEvent {
   venueTs: number | null;    // venue-side event time (ms), null if unknown
   recvTs: number;            // local receive time (ms, high-res epoch)
   depth: VenueDepth;
+  /** ADDED: ms epoch of the market's window end (lets the episode tracker pair venues and detect rollover). */
+  closeMs?: number;
 }
 
 /** Latency profile: per-component empirical samples (ms). Loaded from data/latency.json (written by probe) or defaults. */
@@ -37,7 +43,7 @@ export interface LegFill {
   sentAt: number; arriveAt: number; ackAt: number;   // venue-time/ local ms on a common timeline
   seenAsk: number | null;                            // best ask when decided
   arrivalAsk: number | null;                         // best ask at arrival
-  missReason?: "price_moved" | "depth_consumed" | "race_lost" | "no_book" | "below_min_size" | "fok_incomplete";
+  missReason?: "price_moved" | "depth_consumed" | "race_lost" | "no_book" | "below_min_size" | "fok_incomplete" | "not_sent";
 }
 
 export type StrategyId = "NAIVE" | "PAR" | "K_THEN_P" | "P_THEN_K";
@@ -49,6 +55,15 @@ export interface AttemptResult {
   timeToBothMs: number | null;
   retried: boolean;
   unwound: boolean; unwindPnlCents: number | null;
+  // --- ADDED (all optional so replay/probe code that builds results by hand keeps compiling) ---
+  combo?: Episode["combo"];
+  qty?: number;                         // requested contracts per leg
+  decidedAt?: number;                   // local ms
+  edgeCents?: number;                   // 100 - (seen kalshi ask + seen poly ask) at decision
+  expPnlUsd?: number;                   // edge-based expectation (hedged pairs lock the edge; unhedged remainder marked to bid)
+  pnlUsd?: number;                      // set once the real settlement is known
+  source?: "trade" | "episode";
+  tradeId?: number | null;
 }
 
 export interface Episode {

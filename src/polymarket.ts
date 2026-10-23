@@ -2,11 +2,12 @@ import { config } from "./config.ts";
 import { chainlinkAvg60, chainlinkSpot } from "./feeds/chainlink.ts";
 import { twapAt, twapAvg60, twapSpot } from "./feeds/polyLive.ts";
 import { polyTop, setPolyTop, watchTokens } from "./feeds/polyBook.ts";
+import { setPolyMeta } from "./exec/hub.ts";
 import { getJson, jsonArr, realAsk } from "./http.ts";
 import { loadStrike, saveStrike, type StoredStrike } from "./db.ts";
 import type { Side, VenueSnapshot } from "./types.ts";
 
-interface Lookup { start: number; slug: string; title: string; upToken: string; downToken: string; openTime: string; closeTime: string; priceToBeat: number | null }
+interface Lookup { start: number; slug: string; title: string; upToken: string; downToken: string; openTime: string; closeTime: string; priceToBeat: number | null; tickSize?: number; minSize?: number; secondsDelayMs?: number }
 let cache: { start: number; lookup: Lookup | null; at: number } | null = null;
 
 const slugFor = (startSec: number) => `btc-updown-15m-${startSec}`;
@@ -33,6 +34,8 @@ async function lookup(now: number): Promise<Lookup | null> {
       openTime: new Date(start * 1000).toISOString(),
       closeTime: new Date(Date.parse(m.endDate ?? e.endDate) || (start + 900) * 1000).toISOString(),
       priceToBeat: Number(e.eventMetadata?.priceToBeat) || null,
+      tickSize: Number(m.orderPriceMinTickSize) || undefined, minSize: Number(m.orderMinSize) || undefined,
+      secondsDelayMs: Number.isFinite(Number(m.secondsDelay)) && m.secondsDelay !== undefined && m.secondsDelay !== null ? Number(m.secondsDelay) * 1000 : undefined,
     };
   }
   cache = { start, lookup: l, at: now };
@@ -132,7 +135,8 @@ export async function fetchPolymarket(now = Date.now()): Promise<VenueSnapshot |
   const l = await lookup(now);
   if (!l) return null;
   const sk = await resolveStrike(l.start, l.priceToBeat, now);
-  watchTokens(l.upToken, l.downToken);
+  setPolyMeta({ slug: l.slug, closeMs: Date.parse(l.closeTime) || undefined, tickSize: l.tickSize, minSize: l.minSize, secondsDelayMs: l.secondsDelayMs });
+  watchTokens(l.upToken, l.downToken, l.slug);
   let u = polyTop(l.upToken), d = polyTop(l.downToken);
   const stale = (t: typeof u) => !t || Date.now() - t.ts > config.maxQuoteAgeMs;
   if ((stale(u) || stale(d)) && Date.now() - lastRest >= 2000) { // quiet or disconnected WS book: confirm via REST (throttled)

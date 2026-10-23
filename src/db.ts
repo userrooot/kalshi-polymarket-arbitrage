@@ -15,6 +15,9 @@ function db(): Database {
   d.run("CREATE TABLE IF NOT EXISTS events (event_key TEXT PRIMARY KEY, kalshi_ticker TEXT NOT NULL)");
   // Price-to-beat per 15m window (windowStart = unix seconds), so a restart mid-window keeps the strike.
   d.run("CREATE TABLE IF NOT EXISTS strikes (windowStart INTEGER NOT NULL, venue TEXT NOT NULL, value REAL NOT NULL, source TEXT NOT NULL, PRIMARY KEY (windowStart, venue))");
+  d.run("CREATE TABLE IF NOT EXISTS episodes (id INTEGER PRIMARY KEY AUTOINCREMENT, combo TEXT, event_key TEXT, start_recv REAL, duration_ms REAL, killed_by TEXT, censored INTEGER, data TEXT NOT NULL)");
+  d.run("CREATE TABLE IF NOT EXISTS exec_attempts (id INTEGER PRIMARY KEY AUTOINCREMENT, trade_id INTEGER, strategy TEXT, outcome TEXT, ts REAL, data TEXT NOT NULL)");
+  d.run("CREATE TABLE IF NOT EXISTS latency_samples (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL, data TEXT NOT NULL)");
   return (_db = d);
 }
 
@@ -41,4 +44,16 @@ export function saveStrike(windowStart: number, venue: string, value: number, so
 export function loadStrike(windowStart: number, venue: string): StoredStrike | null {
   const r = db().query("SELECT value,source FROM strikes WHERE windowStart=? AND venue=?").get(windowStart, venue) as StoredStrike | null;
   return r && Number(r.value) > 0 ? { value: Number(r.value), source: String(r.source) } : null;
+}
+
+// --- realistic execution simulation persistence (best effort; callers wrap in try/catch) ---
+export function saveEpisodeRow(e: { combo: string; eventKey: string; startRecv: number; durationMs: number | null; killedBy: string | null; censored: boolean }) {
+  db().query("INSERT INTO episodes (combo,event_key,start_recv,duration_ms,killed_by,censored,data) VALUES (?,?,?,?,?,?,?)")
+    .run(e.combo, e.eventKey, e.startRecv, e.durationMs, e.killedBy, e.censored ? 1 : 0, JSON.stringify(e));
+}
+export function saveAttemptRow(tradeId: number | null, strategy: string, outcome: string, ts: number, data: unknown) {
+  db().query("INSERT INTO exec_attempts (trade_id,strategy,outcome,ts,data) VALUES (?,?,?,?,?)").run(tradeId, strategy, outcome, ts, JSON.stringify(data));
+}
+export function saveLatencySample(ts: number, data: unknown) {
+  db().query("INSERT INTO latency_samples (ts,data) VALUES (?,?)").run(ts, JSON.stringify(data));
 }

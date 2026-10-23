@@ -1,3 +1,4 @@
+import { tapRaw } from "../exec/recorderHook.ts";
 import { meter } from "./meter.ts";
 
 export interface WSOpts {
@@ -29,7 +30,7 @@ export function connectWS(o: WSOpts): WSHandle {
   const proxy = process.env.HTTPS_PROXY || process.env.https_proxy;
 
   const handle: WSHandle = {
-    send(s) { try { if (ws?.readyState === 1) ws.send(typeof s === "string" ? s : JSON.stringify(s)); } catch {} },
+    send(s) { try { if (ws?.readyState === 1) { const out = typeof s === "string" ? s : JSON.stringify(s); if (out !== "PING") tapRaw(o.name + ">", out); ws.send(out); } } catch {} }, // ">" = outbound (subscriptions), recorded so replay knows the token/ticker mapping
     close() { closed = true; cleanup(); try { ws?.close(); } catch {} },
     reconnect() { try { ws?.close(); } catch {} drop(); },
   };
@@ -67,7 +68,9 @@ export function connectWS(o: WSOpts): WSHandle {
     mine.onmessage = (e) => {
       if (ws !== mine) return;
       lastMsg = Date.now(); attempt = 0; m.hit();
-      try { o.onMessage(typeof e.data === "string" ? e.data : String(e.data), handle); } catch (err) { console.error(`[${o.name}] onMessage`, err); }
+      const data = typeof e.data === "string" ? e.data : String(e.data);
+      tapRaw(o.name, data); // raw-message recorder tap (no-op unless RECORD_MD=1)
+      try { o.onMessage(data, handle); } catch (err) { console.error(`[${o.name}] onMessage`, err); }
     };
     mine.onerror = () => { if (!dead && ws === mine) { try { o.onError?.(); } catch (err) { console.error(`[${o.name}] onError`, err); } } die(); };
     mine.onclose = (e: any) => {
