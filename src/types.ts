@@ -19,8 +19,11 @@ export interface VenueSnapshot {
   ts: number;                // ms when fetched
   // live BTC spot matching this venue's resolution source
   spot: number | null;       // USD
-  spotSource: "chainlink" | "chainlink-twap" | "cfbenchmarks" | "brti-proxy" | "coinbase-rest" | null;
+  spotSource: "chainlink" | "chainlink-twap" | "cfbenchmarks" | null;
   spotTs: number | null;     // ms received
+  spotSettle: number | null; // Kalshi: exact last_60s_windowed_average_15min (final minute only), else null
+  spotError: string | null;  // why official spot is missing (e.g. 'no Kalshi API key', 'auth: header_timestamp_expired')
+  strikeSource: string | null; // e.g. 'kalshi floor_strike', 'chainlink@window-start', 'polymarket priceToBeat'
   spotAvg60: number | null;  // running mean of spot over last 60s (settlement estimate; Kalshi uses [T-60s,T-1s])
   quoteSource: "ws" | "rest"; // how Up/Down prices were obtained
   quoteAgeMs: number | null;
@@ -95,6 +98,7 @@ export interface DashboardState {
   maxTradesPerEvent: number;
   contractsPerTrade: number;
   btcPrice: number | null;
+  alerts: string[];          // red banner messages (missing keys, auth failures)
   feeds: FeedStat[];
   tickRate: { ticksPerSec: number; broadcastsPerSec: number };
   kalshi: VenueSnapshot | null;
